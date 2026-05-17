@@ -5,18 +5,19 @@ include("loss_MSE.jl")
 
 
 
-spectral_grid = SpectralGrid(trunc=63, nlayers=8)
+spectral_grid = SpectralGrid(trunc=31, nlayers=4)
 
-my_radiation1 = LinearLongwave(spectral_grid; a=-1e-6, b=1e-3)
-my_radiation2 = LinearLongwave(spectral_grid; a=0., b=0.)
 
-model1 = PrimitiveDryModel(spectral_grid; longwave_radiation=my_radiation1)
-model2 = PrimitiveDryModel(spectral_grid; longwave_radiation=my_radiation2)
+model1 = PrimitiveWetModel(spectral_grid)
+model2 = PrimitiveWetModel(spectral_grid)
 
 simulation1 = initialize!(model1)
 simulation2 = initialize!(model2)
 
-#Random.seed!(123)
+
+
+
+
 
 noise = 0.001 .* (
     randn(Float32, size(simulation1.variables.prognostic.temperature)) .+

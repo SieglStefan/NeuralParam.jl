@@ -1,5 +1,16 @@
 
 
+
+extract_gradients(::LinearLongwave, bmodel_rad) =
+    (; a = bmodel_rad.longwave_radiation.a,
+       b = bmodel_rad.longwave_radiation.b)
+
+extract_gradients(::NeuralLinearLongwave, bmodel_rad) =
+    bmodel_rad.longwave_radiation.ps
+
+
+
+
 # Function for preparing data and autodiffing the loss function
 function compute_gradients!(vars_0, vars_target, model_rad, dt)
 
@@ -32,14 +43,14 @@ function compute_gradients!(vars_0, vars_target, model_rad, dt)
             Duplicated(model_rad, bmodel_rad))      # Model with parameters to differentiate
        
 
-    # Extract gradients for the parameters a and b            
-    ba = bmodel_rad.longwave_radiation.a
-    bb = bmodel_rad.longwave_radiation.b
+    # Extract gradients for the parameters a and b  
+    grads = extract_gradients(model_rad.longwave_radiation, bmodel_rad)  
+    
 
     # Calculate loss
     L = MSE(T_rad, T_target)
 
-    return L, ba, bb
+    return L, grads
 end
 
 
@@ -61,7 +72,9 @@ function calibration_step!(spectral_grid; step,
     SpeedyWeather.timestep!(vars_target, dt, model_target)
 
     # Calculate gradients
-    loss, ba, bb = compute_gradients!(vars_0, vars_target, model_rad, dt)
+    loss, grads = compute_gradients!(vars_0, vars_target, model_rad, dt)
+    ba = grads.a
+    bb = grads.b
 
     # Update parameters and storage
     L[step] = loss
