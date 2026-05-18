@@ -10,9 +10,6 @@ run!(sim, period=Hour(1))
 
 
 
-
-
-
 T_grid = make_zero(sim.variables.grid.temperature)
 T_grid .+= 300.
 
