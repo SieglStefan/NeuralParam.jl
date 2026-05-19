@@ -1,3 +1,4 @@
+### Structs and functions for the LinearLongwave Parameterization
 
 
 # Defines a parameterization scheme for linear longwave radiation: dT = a * T + b, where a and b are parameters of the scheme
@@ -6,19 +7,23 @@
     b::NF = 1e-3
 end
 
+
 # Convenience constructor
 function LinearLongwave(SG::SpeedyWeather.SpectralGrid; kwargs...)
     return LinearLongwave{SG.NF}(; kwargs...)
 end
+
 
 # Initializing function
 function SpeedyWeather.initialize!(::LinearLongwave, ::AbstractModel)
     return nothing
 end
 
-# Calculate the tendencies
+
+# Calculate tendencies
 Base.@propagate_inbounds function SpeedyWeather.parameterization!(ij, vars::Variables, para::LinearLongwave, model)
     
+    # Main loop: Get current temperature of grid-cell ij and update tendencies
     for k in 1:model.spectral_grid.nlayers
         Tk = vars.grid.temperature[ij,k]
         dTk = para.a * Tk + para.b
