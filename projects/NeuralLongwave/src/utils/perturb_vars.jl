@@ -3,7 +3,7 @@
 
 
 # Function for pertubing the grid temperature field of a simulation for IC sampling using white noise
-function perturb_grid_temp!(sim; amp=1., rng=Random.default_rng())
+function perturb_grid_temp!(sim; amp=2., rng=Random.default_rng())
 
     # Initialize simulation (if not initialized yet, T_grid is empty)
     initialize!(sim)
