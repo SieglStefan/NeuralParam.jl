@@ -9,7 +9,7 @@
     n_hidden::Int = 2                       # number of hidden layers
     activation::Symbol = :tanh              # activation function
     sc_a::Float32 = 1f-6                    # scaling factor for a-output
-    sc_b::Float32 = 1f-3                    # scaling factor for b-output
+    sc_b::Float32 = 1f-4                    # scaling factor for b-output
     T_mean::Float32 = 249.83                # mean temperature for zscore, calculated in "zscore_calc_params.jl"
     T_std::Float32 =  23.09                 # temperature std for zscore, calculated in "zscore_calc_params.jl"
 end

@@ -3,14 +3,14 @@
 
 
 # Function for performing one calibration step (Calculating gradients and updating a and b)
-function calibration_step!(;radiation_llw,
+function calibration_step!( radiation_llw;
                             vars0, 
                             sim_target, 
                             sim_train,
                             dt,
                             eta,
                             opt_state,             # Not explicitely needed for calibration, but needed for training, so we keep it here for the online optimization loop
-                            step,
+                            step_update,
                             printing_updates)
 
     # Compute gradients 
@@ -18,8 +18,8 @@ function calibration_step!(;radiation_llw,
  
     # Calculate new parameters with gradient descent 
         # (multiplication with parameters at the end = normalizing learning rate eta)
-    a_new = radiation_llw.a - eta * grads.a * abs(radiation_llw.a)
-    b_new = radiation_llw.b - eta * grads.b * abs(radiation_llw.b)
+    a_new = radiation_llw.a - eta * grads.a * radiation_llw.sc_grad_a
+    b_new = radiation_llw.b - eta * grads.b * radiation_llw.sc_grad_b
 
     # Update radiation_llw parameter
     radiation_llw.a = a_new
@@ -28,7 +28,7 @@ function calibration_step!(;radiation_llw,
 
     # Print information about calibration for debugging
     if printing_updates
-        println("Step $step, Loss=$loss, a=$a_new, b=$b_new, ba=$(grads.a), bb=$(grads.b)")
+        println("Step $step_update, Loss=$loss, a=$a_new, b=$b_new, ba=$(grads.a), bb=$(grads.b)")
     end
 
     return loss, grads, nothing
@@ -39,7 +39,7 @@ end
 # Function for calibrating a LinearLongwave parameterization
 function run_calibration!(  radiation_llw,              # to be calibrated LinearLongwave parameterization
                             spectral_grid;              # defines truncation and number of vertical layers  
-                            eta = 1f-4,                 # learning rate
+                            eta0 = 1f-8,                 # learning rate
                             t_spinup = Day(14),          # spinup time for IC sampling
                             n_ic = 10,                  # number of IC used
                             n_updates = 100,            # number of updates per IC
@@ -58,18 +58,19 @@ function run_calibration!(  radiation_llw,              # to be calibrated Linea
 
     
     # Run online optimization loop for calibrating radiation_llw
-    L, P, G = run_online_optimization!( scheme_step! = calibration_step!,
-                                        radiation = radiation_llw,
-                                        spectral_grid,        
-                                        eta,             
-                                        t_spinup,     
-                                        n_ic,
-                                        n_updates,                
-                                        n_gap,
-                                        n_steps,          
-                                        printing_ic,  
-                                        printing_updates,
-                                        opt_state = nothing)    # no optimizer state needed for calibration, only for training
+    run_online_optimization!(;  scheme_step! = calibration_step!,
+                                radiation = radiation_llw,
+                                spectral_grid,        
+                                eta0,             
+                                t_spinup,     
+                                n_ic,
+                                n_updates,                
+                                n_gap,
+                                n_steps,          
+                                printing_ic,  
+                                printing_updates,
+                                opt_state = nothing,    # no optimizer state needed for calibration, only for training
+                                L, P, G)
 
     return L, P, G
 end

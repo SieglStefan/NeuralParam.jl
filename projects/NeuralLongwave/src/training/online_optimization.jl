@@ -15,11 +15,11 @@ end
 
 
 
-# XXX
+# Optimization loop for online training/calibration 
 function run_online_optimization!(; scheme_step!,
                                     radiation,          
                                     spectral_grid,        
-                                    eta,             
+                                    eta0,             
                                     t_spinup,     
                                     n_ic,
                                     n_updates,                
@@ -27,7 +27,8 @@ function run_online_optimization!(; scheme_step!,
                                     n_steps,          
                                     printing_ic,  
                                     printing_updates,
-                                    opt_state)   
+                                    opt_state,
+                                    L, P, G)
 
     
     # Create template model and simulation and extract time stepping
@@ -45,9 +46,12 @@ function run_online_optimization!(; scheme_step!,
         # Create reference simulation (later sim_target and sim_train are pulled back on this simulation)
         sim_ref = deepcopy(sim_target)
 
+        # Copy initial learning rate
+        eta = copy(eta0)
+
         
         # Online training loop
-        for step in 1:n_updates
+        for step_update in 1:n_updates
 
             # Pull the target and training simulation on the reference simulation
             vars0 = sim_pair_pullback!(sim_ref, sim_target, sim_train)
@@ -55,15 +59,23 @@ function run_online_optimization!(; scheme_step!,
             # Do one timestep! for the target and training simulation needed for loss seeding
             sim_pair_timestep!(sim_target, sim_train, dt)
             
+            # Update learning rate
+            if step_update % 20 == 0
+                eta *= 0.5
+                if !isnothing(opt_state)
+                    Optimisers.adjust!(opt_state, eta)
+                end
+            end
+
             # Do one training step and update parameters of radiation
-            loss, grads, opt_state = scheme_step!(; radiation,
+            loss, grads, opt_state = scheme_step!(  radiation;
                                                     vars0, 
                                                     sim_target, 
                                                     sim_train,
                                                     dt,
                                                     eta,
                                                     opt_state,
-                                                    step,
+                                                    step_update,
                                                     printing_updates)                          
 
             # Store loss, parameters and gradients

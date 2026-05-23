@@ -6,6 +6,8 @@
 @kwdef mutable struct LinearLongwave{NF} <: SpeedyWeather.AbstractLongwave
     a::NF = -6.3f-7
     b::NF = 1.4f-4
+    sc_grad_a::Float32 = 1f-11            # scaling factor for gradient of a for gradient descent
+    sc_grad_b::Float32 = 1f-6             # scaling factor for gradient of b for gradient descent
 end
 
 

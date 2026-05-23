@@ -24,6 +24,10 @@ export LinearLongwave,
        MSE,
        zscore,
        plot_calibration,
+       plot_loss,
+       plot_rmse_diff,
+       plot_bias_diff,
+       plot_correlation_diff,
        save,
        load_neural_longwave
 
@@ -40,12 +44,14 @@ include("utils/perturb_vars.jl")
 include("parameterizations/linear_longwave.jl")
 include("parameterizations/neural_linear_longwave.jl")
 
+
 # IO
 include("utils/io.jl")
 
 
 # Training infrastructure
-include("training/simulation_pair.jl")
+include("training/simulation.jl")
+include("training/online_optimization.jl")
 include("training/gradients.jl")
 include("training/run_calibration.jl")
 include("training/run_training.jl")
