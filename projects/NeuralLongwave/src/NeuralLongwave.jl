@@ -64,7 +64,7 @@ include("utils/data.jl")
 # Structs / Parameterizations
 include("parameterizations/abstract_longwave.jl")
 include("parameterizations/const_llw.jl")
-include("parameterizations/neural_llw_common.jl")
+include("parameterizations/neural_llw_config.jl")
 include("parameterizations/neural_llw_ad.jl")
 include("parameterizations/neural_llw.jl")
 

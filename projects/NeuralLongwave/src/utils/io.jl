@@ -1,7 +1,7 @@
 ### IO utilities
 ###
 ### Helper functions for saving and loading NeuralLinearLongwave
-### parameterizations using JLD2.
+### parameterizations using JLD2 and zscore statistics.
 
 
 
@@ -21,7 +21,6 @@ function save_neural_longwave(; path::String, radiation::AbstractNeuralLinearLon
 
     return filepath
 end
-
 
 
 # Load a neural longwave parameterization as Lux inference version
@@ -44,4 +43,19 @@ function load_neural_longwave(; path::String, name::String, SG::SpeedyWeather.Sp
         st,
         config,
     )
+end
+
+
+
+# Function for loading pre-generated zscore statistics
+function load_zscore(file)
+    path = joinpath(@__DIR__, "..", "..", "data", "zscore", file)
+
+    if !isfile(path)
+        error("Z-score statistics file not found: $path")
+    end
+
+    data = JLD2.load(path)
+
+    return data
 end

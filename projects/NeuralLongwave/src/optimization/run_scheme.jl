@@ -6,10 +6,10 @@
 
 
 # Convenience wrapper for calibrating a constant LinearLongwave parameterization
-function run_calibration!(radiation_llw, spectral_grid; kwargs...)
+function run_calibration!(radiation::AbstractConstLongwave, spectral_grid; kwargs...)
 
     return run_optimization!(;
-        radiation = radiation_llw,
+        radiation,
         spectral_grid,
         kwargs...,
     )
@@ -17,10 +17,10 @@ end
 
 
 # Convenience wrapper for training a NeuralLinearLongwave parameterization
-function run_training!(radiation_nllw, spectral_grid; kwargs...)
+function run_training!(radiation::AbstractLuxLongwave, spectral_grid; kwargs...)
     
     return run_optimization!(;
-        radiation = radiation_nllw,
+        radiation,
         spectral_grid,
         kwargs...,
     )

@@ -103,12 +103,12 @@ end
 
 
 # Extract gradients from a constant LinearLongwave parameterization
-extract_gradients(::ConstLinearLongwave, bmodel_rad) = (;
+extract_gradients(::AbstractConstLongwave, bmodel_rad) = (;
     a = bmodel_rad.longwave_radiation.a,
     b = bmodel_rad.longwave_radiation.b,
 )
 
 
 # Extract gradients from a neural LinearLongwave parameterization
-extract_gradients(::AbstractNeuralLinearLongwave, bmodel_rad) =
+extract_gradients(::AbstractLuxLongwave, bmodel_rad) =
     bmodel_rad.longwave_radiation.ps

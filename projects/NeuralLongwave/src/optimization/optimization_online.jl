@@ -196,41 +196,41 @@ end
 
 
 # Helper function for getting trainable parameters for Optimisers
-get_trainable_params(r::ConstLinearLongwave) = (;
+get_trainable_params(r::AbstractConstLongwave) = (;
     a = Float32[r.a / r.sc_a],
     b = Float32[r.b / r.sc_b],
 )
 
 # Helper function for getting trainable parameters for Optimisers
-get_trainable_params(r::AbstractNeuralLinearLongwave) = r.ps
+get_trainable_params(r::AbstractLuxLongwave) = r.ps
 
 
 
 # Helper function for extracting parameters from a constant LinearLongwave parameterization
-function extract_parameters(radiation::ConstLinearLongwave)
+function extract_parameters(radiation::AbstractConstLongwave)
     return (radiation.a, radiation.b)
 end
 
 # Helper function for extracting parameters from a neural LinearLongwave parameterization
-function extract_parameters(radiation::AbstractNeuralLinearLongwave)
+function extract_parameters(radiation::AbstractLuxLongwave)
     return deepcopy(radiation.ps)
 end
 
 
 
 # Helper function for extracting and scaling gradients
-get_trainable_grads(r::ConstLinearLongwave, g) = (;
+get_trainable_grads(r::AbstractConstLongwave, g) = (;
     a = Float32[g.a * r.sc_a],
     b = Float32[g.b * r.sc_b],
 )
 
 # Helper function for extracting neural gradients
-get_trainable_grads(r::AbstractNeuralLinearLongwave, g) = g
+get_trainable_grads(r::AbstractLuxLongwave, g) = g
 
 
 
 # Helper function for setting parameters of the constant LinearLongwave parameterization
-function set_trainable_params!(r::ConstLinearLongwave, ps)
+function set_trainable_params!(r::AbstractConstLongwave, ps)
     r.a = ps.a[1] * r.sc_a
     r.b = ps.b[1] * r.sc_b
 
@@ -238,7 +238,7 @@ function set_trainable_params!(r::ConstLinearLongwave, ps)
 end
 
 # Helper function for setting parameters of a neural LinearLongwave parameterization
-function set_trainable_params!(r::AbstractNeuralLinearLongwave, ps)
+function set_trainable_params!(r::AbstractLuxLongwave, ps)
     r.ps = ps
 
     return nothing
