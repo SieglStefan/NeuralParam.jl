@@ -33,7 +33,7 @@ function NeuralABRLongwaveConfig(
     width::Int = 32,
     n_hidden::Int = 2,
     activation::Symbol = :tanh,
-    default_CO2::Float32 = 400f0
+    default_CO2::Float32 = 280f0
 )
 
     # Extract vertical layers and calculate input and calculate dimension

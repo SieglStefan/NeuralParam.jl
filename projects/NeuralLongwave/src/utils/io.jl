@@ -1,7 +1,6 @@
 ### IO utilities
 ###
-### Helper functions for saving and loading NeuralLinearLongwave
-### parameterizations using JLD2 and zscore statistics.
+### Helper functions for saving and loading
 
 
 
