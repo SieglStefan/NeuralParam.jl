@@ -14,6 +14,10 @@ function generate_temperature_fields(
     save_every = 1,         # save every n timesteps
 )
 
+    # Copy models
+    model_base_copy = deepcopy(model_base)
+    model_data_copy = deepcopy(model_data)
+
     # Create and spin up base simulation
     sim_base = SpeedyWeather.initialize!(model_base_copy)
     run!(sim_base, period = Day(t_spinup))
@@ -55,7 +59,7 @@ end
 
 
 
-# Perturb the grid temperature field of a simulation with white noise
+# Perturb the grid temperature field of a simulation with additive white noise
 function perturb_grid_temp!(sim; amp = 2.0, rng = Random.default_rng())
 
     # Initialize simulation if needed; otherwise grid variables may be empty
@@ -69,6 +73,27 @@ function perturb_grid_temp!(sim; amp = 2.0, rng = Random.default_rng())
 
     # Use set! so that prognostic variables are updated consistently
     set!(sim, temperature = T_grid)
+    initialize!(sim)
+
+    return nothing
+end
+
+
+# Perturb the grid humidity field of a simulation with multiplicative white noise
+function perturb_grid_humid!(sim; amp = 0.1f0, rng = Random.default_rng())
+
+    # Initialize simulation if needed; otherwise grid variables may be empty
+    initialize!(sim)
+
+    # Copy grid humidity field and apply relative perturbation
+    q_grid = copy(sim.variables.grid.humidity)
+    noise = randn!(rng, similar(q_grid))
+
+    q_grid .*= 1f0 .+ amp .* noise
+    q_grid .= max.(q_grid, 0f0)
+
+    # Use set! so that prognostic variables are updated consistently
+    set!(sim, humidity = q_grid)
     initialize!(sim)
 
     return nothing
