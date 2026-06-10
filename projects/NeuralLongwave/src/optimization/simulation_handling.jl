@@ -18,13 +18,14 @@ end
 
 
 # Create reference, target, and train simulations from a perturbed and spun-up template state
-function create_sims(spectral_grid, sim_template; radiation, t_spinup)
+function create_sims(spectral_grid, sim_template; radiation, t_spinup, amp_pert_T, amp_pert_q)
     
     # Copy template simulation
     sim_pert = deepcopy(sim_template)
 
-    # Perturb temperature field and spin up to obtain a random IC
-    perturb_grid_temp!(sim_pert)
+    # Perturb temperature and humidity fields and spin up to obtain a random IC
+    perturb_grid_temp!(sim_pert, amp = amp_pert_T)
+    perturb_grid_humid!(sim_pert, amp = amp_pert_q)
     run!(sim_pert, period = Hour(t_spinup))
 
     # Reference and target simulations start from the same perturbed state

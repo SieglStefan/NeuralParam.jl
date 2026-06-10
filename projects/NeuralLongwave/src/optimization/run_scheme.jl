@@ -30,26 +30,29 @@ end
 
 # Generic optimization wrapper used by run_calibration! and run_training!()
 function run_optimization!(;
-    radiation,                   # parameterization to be optimized
-    spectral_grid,               # spectral grid used for model construction
+    radiation,                  # parameterization to be optimized
+    spectral_grid,              # spectral grid used for model construction
 
-    eta0 = 1f-3,                 # initial learning rate
-    eta_fac = 1f0,               # learning-rate decay factor
-    eta_steps = 10,              # apply eta_fac every eta_steps
+    eta0 = 1f-3,                # initial learning rate
+    eta_fac = 1f0,              # learning-rate decay factor
+    eta_steps = 10,             # apply eta_fac every eta_steps
 
-    t_spinup = Day(14),          # spinup time before IC sampling
+    t_spinup = Day(14),         # spinup time before IC sampling
 
-    n_ic = 10,                   # number of initial conditions
-    n_traj = 100,                # number of trajectories per IC
-    n_epochs = 50,               # number of updates per trajectory
-    n_gap = 10,                  # timesteps between calibration points
-    n_steps = 1,                 # timesteps used in autodiff/checkpointing
+    n_ic = 10,                  # number of initial conditions
+    n_traj = 100,               # number of trajectories per IC
+    n_epochs = 50,              # number of updates per trajectory
+    n_gap = 10,                 # timesteps between calibration points
+    n_steps = 1,                # timesteps used in autodiff/checkpointing
 
-    printing_ic = true,          # print after every IC
-    printing_traj = true,        # print after every trajectory update
-    printing_epochs = false,     # print after every epoch
+    amp_pert_T = 2.0,           # amplitude of temperature perturbations for IC sampling
+    amp_pert_q = 0.1f0,         # amplitude of humidity perturbations for IC sampling
 
-    test_mode = false,           # skip Enzyme.autodiff if true
+    printing_ic = true,         # print after every IC
+    printing_traj = true,       # print after every trajectory update
+    printing_epochs = false,    # print after every epoch
+
+    test_mode = false,          # skip Enzyme.autodiff if true
 )
 
     # Containers for logging
@@ -82,6 +85,8 @@ function run_optimization!(;
         n_epochs,
         n_gap,
         n_steps,
+        amp_pert_T,
+        amp_pert_q,
         printing_ic,
         printing_traj,
         printing_epochs,
