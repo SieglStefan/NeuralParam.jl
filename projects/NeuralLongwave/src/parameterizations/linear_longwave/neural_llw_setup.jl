@@ -55,7 +55,7 @@ function NeuralLinearLongwaveConfig(
 
 
     # Load zscore statistics 
-    file = "abrlw_T$(trunc)_L$(nlayers).jld2"
+    file = "llw_T$(trunc)_L$(nlayers).jld2"
     data = load_zscore(file)
 
     input_mean  = data["input_mean"]
