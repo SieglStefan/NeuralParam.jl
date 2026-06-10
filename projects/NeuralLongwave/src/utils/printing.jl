@@ -18,7 +18,7 @@ end
 
 
 # Print update after a single optimization step for ConstLinearLongwave
-function print_epochs(radiation::ConstLinearLongwave, epoch, loss, grads_opt)
+function print_epochs(radiation::AbstractConstLongwave, epoch, loss, grads_opt)
     println(
         "\t\t\tEpoch $epoch, Loss=$loss, " *
         "a=$(radiation.a), b=$(radiation.b), " *
@@ -28,7 +28,7 @@ end
 
 
 # Print update after a single optimization step for neural LinearLongwave variants
-function print_epochs(radiation::AbstractNeuralLinearLongwave, epoch, loss, grads_opt)
+function print_epochs(radiation::AbstractLuxLongwave, epoch, loss, grads_opt)
     pnorm = tree_l2norm(radiation.ps)
     gnorm = tree_l2norm(grads_opt)
 

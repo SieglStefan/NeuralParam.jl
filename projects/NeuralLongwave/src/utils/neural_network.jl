@@ -67,7 +67,7 @@ end
 
 
 # Unscales (inverse zscore) NN output for linear LW
-function unscale_nn_output(para::AbstractLinearLongwave, y)
+function unscale_nn_output(para::NeuralLinearLongwave, y)
     
     a = para.config.sc_a * y[1:2:end]
     b = para.config.sc_b * y[2:2:end] 
@@ -76,7 +76,7 @@ function unscale_nn_output(para::AbstractLinearLongwave, y)
 end
 
 # Unscales (inverse zscore) NN output for ABR
-function unscale_nn_output(para::AbstractNeuralABRLongwave, y)
+function unscale_nn_output(para::NeuralABRLongwave, y)
     return inverse_zscore(
         Float32.(y), 
         para.config.output_mean, 

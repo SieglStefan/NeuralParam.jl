@@ -5,7 +5,7 @@
 
 
 # Save a neural longwave parameterization using JLD2
-function save_neural_longwave(; path::String, radiation::AbstractNeuralLinearLongwave)
+function save_neural_longwave(; path::String, radiation::AbstractLuxLongwave)
     
     # Create folder, create file path and save data
     mkpath(path)

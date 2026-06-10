@@ -19,7 +19,7 @@ end
 
 # Constructor for creating Lux NN architecture and parameters
 function NeuralLinearLongwave(
-    config = NeuralLinearLongwaveConfig(),
+    config::NeuralLinearLongwaveConfig;
     rng = Random.default_rng(),
 )
 
@@ -52,9 +52,11 @@ Base.@propagate_inbounds function SpeedyWeather.parameterization!(
 
     # Extract NN input variables
     x_raw = Float32[
-        (vars.grid.temperature[ij, k] for k in 1:nlayers)...,       # temperature
+        vars.grid.temperature[ij, k] for k in 1:nlayers       # temperature
     ]   
     
+    @assert length(x_raw) == length(para.config.input_mean) "input length mismatch"
+
     # Normalize NN input
     x = normalize_nn_input(para, x_raw)
 
@@ -68,7 +70,7 @@ Base.@propagate_inbounds function SpeedyWeather.parameterization!(
 
     # Update temperature tendencies
     for k in 1:nlayers
-        vars.tendencies.grid.temperature[ij, k] += a[k] * Tij[k] + b[k]
+        vars.tendencies.grid.temperature[ij,k] += a[k] * vars.grid.temperature[ij,k] + b[k]
     end
 
     return nothing

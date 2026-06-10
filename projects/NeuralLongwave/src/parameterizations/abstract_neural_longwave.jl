@@ -17,7 +17,7 @@ abstract type AbstractNeuralLongwave <: SpeedyWeather.AbstractLongwave end
 
 
 # Schemes that use a Lux NN
-abstract type AbstractLinearLongwave <: AbstractNeuralLongwave end
+abstract type AbstractLuxLongwave <: AbstractNeuralLongwave end
 
 # Schemes that use const. parameters
 abstract type AbstractConstLongwave <: AbstractNeuralLongwave end
