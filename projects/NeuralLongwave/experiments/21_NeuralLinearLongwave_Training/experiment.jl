@@ -14,25 +14,26 @@
 
 using SpeedyWeather
 
-spectral_grid = SpectralGrid(trunc=31, nlayers=4)
+spectral_grid = SpectralGrid(trunc=31, nlayers=8)
 
 config = NeuralLinearLongwaveConfig(
-    width = 4,
+    spectral_grid;
+    width = 8,
     n_hidden = 1,
 )
 
-radiation_nllw = NeuralLinearLongwave(spectral_grid; config)
+radiation = NeuralLinearLongwave(config)
 
 
-L, P, G, PN, GN = run_training!(radiation_nllw, 
+L, P, G, PN, GN = run_training!(radiation, 
                         spectral_grid;
                         eta0 = 1f-3,
 
-                        n_ic = 1,              
-                        n_traj = 1,
-                        n_epochs = 1,
-                        n_gap = 1,
-                        n_steps = 1,
+                        n_ic = 3,              
+                        n_traj = 10,
+                        n_epochs = 10,
+                        n_gap = 30,
+                        n_steps = 10,
 
                         printing_ic = true,
                         printing_traj = true,

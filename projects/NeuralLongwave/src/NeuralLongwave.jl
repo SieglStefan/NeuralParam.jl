@@ -40,8 +40,9 @@ export
         # parameterizations
         ConstLinearLongwave,
         NeuralLinearLongwaveConfig,
-        NeuralLinearLongwaveAD,
         NeuralLinearLongwave,
+        NeuralABRLongwaveConfig,
+        NeuralABRLongwave,
 
         # io
         save_neural_longwave,
@@ -62,19 +63,21 @@ include("utils/data.jl")
 
 
 # Structs / Parameterizations
-include("parameterizations/abstract_longwave.jl")
-include("parameterizations/const_llw.jl")
-include("parameterizations/neural_llw_config.jl")
-include("parameterizations/neural_llw_ad.jl")
-include("parameterizations/neural_llw.jl")
+include("parameterizations/abstract_neural_longwave.jl")
+include("parameterizations/linear_longwave/const_llw.jl")
+include("parameterizations/linear_longwave/neural_llw_setup.jl")
+include("parameterizations/linear_longwave/neural_llw.jl")
+include("parameterizations/analytic_band_radiation/neural_abrlw_setup.jl")
+include("parameterizations/analytic_band_radiation/neural_abrlw.jl")
 
 
-# IO and printing
+# IO, printing and neural network utils
 include("utils/io.jl")
 include("utils/printing.jl")
+include("utils/neural_network.jl")
 
 
-# Training infrastructure
+# Optimizing infrastructure
 include("optimization/simulation_handling.jl")
 include("optimization/optimization_online.jl")
 include("optimization/gradients.jl")

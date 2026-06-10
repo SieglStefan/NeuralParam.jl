@@ -37,7 +37,9 @@ function online_optimization!(;
     n_traj,
     n_epochs,                
     n_gap,
-    n_steps,          
+    n_steps,
+    amp_pert_T,
+    amp_pert_q,          
     printing_ic,  
     printing_traj,
     printing_epochs,
@@ -57,7 +59,6 @@ function online_optimization!(;
     # Create template model and simulation and extract time stepping
     sim_template = create_template(spectral_grid)
 
-
     # Counts total optimization updates
     counter = 0
 
@@ -70,6 +71,8 @@ function online_optimization!(;
             sim_template;
             radiation, 
             t_spinup,
+            amp_pert_T,
+            amp_pert_q
         )
 
         # Initialize reference trajectory and do a first step
