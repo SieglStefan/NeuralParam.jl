@@ -26,26 +26,28 @@
 #
 # The reference simulation provides fresh trajectory segments. On each segment,
 # sim_target defines the target state, while sim_train is updated to match it.
-function online_optimization!(; 
-    radiation,
-    spectral_grid,        
-    eta0,             
-    eta_fac,
-    eta_steps,
-    t_spinup,     
-    n_ic,
-    n_traj,
-    n_epochs,                
-    n_gap,
-    n_steps,
-    amp_pert_T,
-    amp_pert_q,          
-    printing_ic,  
-    printing_traj,
-    printing_epochs,
-    test_mode,
-    L, P, G, PN, GN,
-)
+function training_online(;
+        para,
+        spectral_grid,
+        training_config,
+        printing_ic,
+        printing_traj,
+        printing_epochs,
+        test_mode
+    )
+
+    (; eta0, eta0_decay, eta_decay_steps, patience, min_delta,
+    t_spinup, n_ic, n_traj, n_epochs, n_gap, n_steps,
+    amp_pert_T, amp_pert_q) = training_config
+
+    # Containers for logging
+    L = Float32[]       # loss
+    P = []              # full parameters, e.g. (a,b) or ps
+    G = []              # full gradients with respect to P
+    PN = Float32[]      # parameter norm
+    GN = Float32[]      # gradient norm
+
+
 
     @info "Online optimization started!"
 
@@ -57,7 +59,9 @@ function online_optimization!(;
     opt_state = Optimisers.setup(rule, get_trainable_params(radiation))
 
     # Create template model and simulation and extract time stepping
-    sim_template = create_template(spectral_grid)
+    #sim_template = create_template(spectral_grid)
+    model_template = PrimitiveWetModel(; spectral_grid)
+    sim_template = initialize!(model_template)
 
     # Counts total optimization updates
     counter = 0
@@ -66,14 +70,37 @@ function online_optimization!(;
     for ic in 1:n_ic
 
         # Create reference, target, and training simulations out of the template simulation
-        sim_ref, sim_target, sim_train = create_sims(
-            spectral_grid, 
-            sim_template;
-            radiation, 
-            t_spinup,
-            amp_pert_T,
-            amp_pert_q
-        )
+        #sim_ref, sim_target, sim_train = create_sims(
+            #spectral_grid, 
+            #sim_template;
+            #radiation, 
+            #t_spinup,
+            #amp_pert_T,
+            #amp_pert_q
+        #)
+
+        # Copy template simulation
+        sim_pert = deepcopy(sim_template)
+
+        # Perturb temperature and humidity fields and spin up to obtain a random IC
+        perturb_grid_temp!(sim_pert, amp = amp_pert_T)
+        perturb_grid_humid!(sim_pert, amp = amp_pert_q)
+        run!(sim_pert, period = Hour(t_spinup))
+
+        # Reference and target simulations start from the same perturbed state
+        sim_ref = deepcopy(sim_pert)
+        sim_target = deepcopy(sim_pert)
+
+        # Training simulation uses the optimized longwave parameterization
+        model_train = PrimitiveWetModel(; spectral_grid, longwave_radiation = radiation)
+        sim_train = initialize!(model_train)
+        copy!(sim_train.variables, sim_pert.variables)
+
+
+
+
+
+
 
         # Initialize reference trajectory and do a first step
         SpeedyWeather.initialize!(sim_ref, steps = n_traj * (n_gap + n_steps) + 1)
@@ -84,7 +111,21 @@ function online_optimization!(;
         for traj in 1:n_traj
 
             # Prepare target/train simulation pair
-            vars0 = prepare_sim_pair!(sim_target, sim_train, n_steps)
+            #vars0 = prepare_sim_pair!(sim_target, sim_train, n_steps)
+
+            # Initialize simulations with the correct number of steps
+            SpeedyWeather.initialize!(sim_target, steps = n_steps + 1)
+            SpeedyWeather.initialize!(sim_train, steps = n_steps + 1)
+
+            # Perform the first timestep/startup step
+            SpeedyWeather.first_timesteps!(sim_target)
+            SpeedyWeather.first_timesteps!(sim_train)
+
+            # Store initial variables before the differentiated trajectory
+            vars0 = deepcopy(sim_target.variables)
+
+
+
 
             # Propagate target simulation for AD seed / loss
             sim_timesteps!(sim_target, n_steps)            
@@ -94,7 +135,7 @@ function online_optimization!(;
             for epoch in 1:n_epochs
 
                 # Reset training simulation to trajectory start
-                reset_sim!(sim_train, vars0)
+                copy!(sim.variables, vars0)
 
                 # Propagate training simulation with current parameters
                 sim_timesteps!(sim_train, n_steps)
@@ -145,8 +186,8 @@ function online_optimization!(;
             sim_timesteps!(sim_ref, n_gap + n_steps)
 
             # Reset target and training simulations to new reference state
-            reset_sim!(sim_target, sim_ref.variables)
-            reset_sim!(sim_train, sim_ref.variables)
+            copy!(sim.variables, vars0)
+            copy!(sim.variables, vars0)
         end
 
         # Print IC update
@@ -243,6 +284,30 @@ end
 # Helper function for setting parameters of a neural LinearLongwave parameterization
 function set_trainable_params!(r::AbstractLuxLongwave, ps)
     r.ps = ps
+
+    return nothing
+end
+
+
+
+
+
+
+
+
+
+
+
+# Propagate a simulation for n_steps using the leapfrog timestep size
+function sim_timesteps!(sim, n_steps)
+
+    # Extract time stepping
+    dt = 2 * sim.model.time_stepping.Δt
+
+    # Propagate the simulation for n_steps * dt
+    for _ in 1:n_steps
+        SpeedyWeather.timestep!(sim.variables, dt, sim.model)
+    end
 
     return nothing
 end

@@ -1,9 +1,10 @@
-### Data generation utilities
-###
-### Helper functions for sampling temperature fields from SpeedyWeather
-### simulations. Used mainly for offline testing, plotting, or validation.
 
 
+
+
+
+
+    
 
 # Generate a series of temperature fields from a model
 function generate_temperature_fields(

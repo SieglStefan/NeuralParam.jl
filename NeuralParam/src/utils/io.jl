@@ -46,15 +46,3 @@ end
 
 
 
-# Function for loading pre-generated zscore statistics
-function load_zscore(file)
-    path = joinpath(@__DIR__, "..", "..", "data", "zscore", file)
-
-    if !isfile(path)
-        error("Z-score statistics file not found: $path")
-    end
-
-    data = JLD2.load(path)
-
-    return data
-end
