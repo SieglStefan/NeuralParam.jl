@@ -11,6 +11,14 @@ function run_training(
     printing_traj = true,       # print after every trajectory update
     printing_epochs = false,    # print after every epoch
 
+    name = "run1",
+
+    log = false,
+    train_dir = ".",
+
+    save_model = false,
+    model_dir = ".",
+
     test_mode = false,          # skip Enzyme.autodiff if true
 )
 
@@ -27,7 +35,7 @@ function run_training(
 
 
     # Run online optimization loop
-    L, PN, GN = training_online(;
+    lw_radiation, L, PN, GN = training_online(;
         lw_radiation,
         spectral_grid,
         training_config,
@@ -35,8 +43,16 @@ function run_training(
         printing_ic,
         printing_traj,
         printing_epochs,
+        name,
+        log,
+        train_dir,
         test_mode
     )
 
-    return L, PN, GN
+    if save_model
+        filepath = save_longwave(; path = model_dir, radiation = lw_radiation)
+        @info "Parameterization saved at $filepath"
+    end
+
+    return lw_radiation, L, PN, GN
 end

@@ -9,7 +9,7 @@ function save_longwave(; path::String, radiation)
     
     # Create folder, create file path and save data
     mkpath(path)
-    filepath = joinpath(path, radiation.config.name * ".jld2")
+    filepath = joinpath(path, ".jld2")
 
     JLD2.jldsave(filepath; radiation = radiation)
 

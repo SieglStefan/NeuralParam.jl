@@ -3,8 +3,7 @@
 
 
 # Configuration struct
-struct NeuralLinearLWConfig
-    name::String                    # name of parameterization object, used in saving and loading        
+struct NeuralLinearLWConfig       
     
     n_in::Int                       # nn input dimension
     n_out::Int                      # nn output dimension
@@ -21,7 +20,6 @@ end
 function NeuralLinearLWConfig(
     spectral_grid::SpeedyWeather.SpectralGrid,
     nn_config::AbstractNNConfig;
-    name::String = "default_name" 
 )
 
     # Extract number of vertical layers
@@ -48,7 +46,6 @@ function NeuralLinearLWConfig(
 
     # Return parameterization object
     return NeuralLinearLWConfig(
-        name,
         n_in,
         n_out,
         nn_config,

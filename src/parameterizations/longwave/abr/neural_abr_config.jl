@@ -4,8 +4,6 @@
 
 # Configuration struct
 struct NeuralABRLWConfig
-    name::String                    # name of parameterization object, used in saving and loading        
-    
     n_in::Int                       # nn input dimension
     n_out::Int                      # nn output dimension
     nn_config::AbstractNNConfig     # nn configuration (n_hidden, width, activation)
@@ -18,7 +16,6 @@ end
 function NeuralABRLWConfig(
     spectral_grid::SpeedyWeather.SpectralGrid,
     nn_config::AbstractNNConfig;
-    name::String = "default_name" 
 )
 
 
@@ -46,7 +43,6 @@ function NeuralABRLWConfig(
 
      # Return parameterization object
     return NeuralABRLWConfig(
-        name,
         n_in,
         n_out,
         nn_config,

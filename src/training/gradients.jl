@@ -117,6 +117,25 @@ function seed_loss!(bvars_ad, ::AbstractLinearLW, vars_train, vars_target)
     return rmse(T_train, T_target)
 end
 
+
+# XXX  Change later
 function seed_loss!(bvars_ad, ::AbstractABRLW, vars_train, vars_target)
-    return nothing
+    # Extract final temperature fields
+    T_train = vars_train.grid.temperature
+    T_target = vars_target.grid.temperature
+    N = length(T_target)
+
+
+    # Seed reverse AD with dMSE/dT_train_out, where T_out is the final temperature after n_steps.
+    #
+    # Before autodiff:
+    #   bvars_ad.grid.temperature = dL/dT_train_out = 2 .* (T_train_out .- T_target_out) ./ N
+    #          -> L = (T_train_out - T_target_out)^2 / N = MSE
+    #
+    # After autodiff:
+    #   bvars_ad contains dL/d(vars_ad input)
+    #
+    bvars_ad.grid.temperature.= 2f0 .* (T_train .- T_target)  ./ N
+
+    return rmse(T_train, T_target)
 end
