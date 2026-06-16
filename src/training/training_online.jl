@@ -9,12 +9,15 @@ function training_online(;
         printing_ic,
         printing_traj,
         printing_epochs,
+        name,
+        log,
+        train_dir,
         test_mode
     )
 
-    (; eta0, eta_decay, eta_decay_steps, patience, min_delta,
+    (; eta0, eta_decay, patience, min_delta,
     t_spinup, n_ic, n_traj, n_epochs, n_gap, n_steps,
-    amp_pert_T, amp_pert_q) = training_config
+    fac_pert_T, fac_pert_q) = training_config
 
 
     # Containers for logging
@@ -28,6 +31,10 @@ function training_online(;
 
     rule = Optimisers.Adam(eta)
     opt_state = Optimisers.setup(rule, lw_radiation.ps)
+
+    best_loss = 1000f0
+    stale = 0
+    best_ps = deepcopy(lw_radiation.ps)
 
 
     # Create template model and simulationfor later copying
@@ -53,7 +60,14 @@ function training_online(;
     @info "Online training started!"
     print_config(training_config, 2*model_template.time_stepping.Δt_sec)
     
+    # XXX
+    if log
+        path = joinpath(train_dir, "$name.csv")
+        io = open(path, "w")
 
+        println(io, "ic,traj,epoch,loss,eta,pnorm,gnorm") 
+        flush(io)
+    end
 
     # Loop over initial conditions
     for ic in 1:n_ic
@@ -64,8 +78,8 @@ function training_online(;
         sim_pert = deepcopy(sim_template)
 
         # Perturb temperature and humidity fields
-        perturb_grid_field!(sim_pert, :temperature, fac_add = amp_pert_T)
-        perturb_grid_field!(sim_pert, :humidity, fac_mult = amp_pert_q, zeromin = true)
+        perturb_grid_field!(sim_pert, :temperature, fac_add = fac_pert_T)
+        perturb_grid_field!(sim_pert, :humidity, fac_mult = fac_pert_q, zeromin = true)
         
         # Spinup simulation 
         run!(sim_pert, period = Hour(t_spinup))
@@ -133,6 +147,11 @@ function training_online(;
                 push!(L, loss)
                 push!(PN, Float32(tree_l2norm(ps_new)))
                 push!(GN, Float32(tree_l2norm(grads)))
+
+                if log
+                    println(io, "$ic, $traj, $epoch, $(L[end]), $eta, $(PN[end]), $(GN[end])")
+                    flush(io)
+                end
                     
 
                 # Print epoch update
@@ -141,14 +160,6 @@ function training_online(;
                 end
             end
 
-
-            # Update learning rate
-            total_traj = (ic-1)*n_traj + traj
-
-            if total_traj % eta_decay_steps == 0
-                eta *= eta_decay
-                Optimisers.adjust!(opt_state, eta)
-            end
 
 
             # Propagate reference trajectory forward
@@ -163,6 +174,22 @@ function training_online(;
             end
         end
 
+        # Update learning rate
+        eta *= eta_decay
+        Optimisers.adjust!(opt_state, eta)
+
+        if L[end] < best_loss - min_delta
+            best_loss = L[end]
+            best_ps = deepcopy(lw_radiation.ps)
+            stale = 0
+        else
+            stale += 1
+            if stale >= patience 
+                @warn "Training finished early! (no loss decrease)"
+                break
+            end
+        end
+
         # Print IC update
         if printing_ic
             print_ic(ic, L[end], PN[end], GN[end])
@@ -171,7 +198,9 @@ function training_online(;
     
     println("Training finished!")
 
-    return lw_radiation, L, PN, GN
+    log && close(io)
+
+    return update_ps(lw_radiation, best_ps), L, PN, GN
 end
 
 
