@@ -1,6 +1,6 @@
 # NeuralParam.jl
 
-**Learning longwave-radiation parameterizations for [SpeedyWeather.jl](https://github.com/SpeedyWeather/SpeedyWeather.jl) by differentiable online training.**
+**Learning neural parameterizations for [SpeedyWeather.jl](https://github.com/SpeedyWeather/SpeedyWeather.jl) by differentiable online training.**
 
 > 🎓 This repository contains the code for my **Master's thesis** on data-driven
 > neural parameterizations for SpeedyWeather.jl, written in the
@@ -9,24 +9,22 @@
 
 ## What it does
 
-NeuralParam.jl replaces a physical longwave-radiation parameterization in the
+NeuralParam.jl replaces physical parameterizations in the
 [SpeedyWeather.jl](https://github.com/SpeedyWeather/SpeedyWeather.jl) atmospheric
-model with a small neural network and trains it **online**: gradients of a
-*trajectory-matching loss* are propagated *through* the model's time stepping with
-reverse-mode automatic differentiation
+model with a small neural network and trains it **online**: gradients are propagated **through** the model's time stepping with reverse-mode automatic differentiation
 ([Enzyme.jl](https://github.com/EnzymeAD/Enzyme.jl) +
 [Checkpointing.jl](https://github.com/Argonne-National-Laboratory/Checkpointing.jl)),
 so the scheme is optimized in the same dynamical setting in which it later runs.
 
-The loss is the temperature RMSE between a *target* and a *trained* simulation after a
-short trajectory segment, averaged over many perturbed initial conditions.
+Currently only longwave parameterizations are implemented.
+
 
 ## Schemes
 
 | Scheme | Type | Idea |
 | --- | --- | --- |
 | `ConstLinearLW` | baseline | Global per-layer constants `a, b` in `dT = a·T + b` (linearized Stefan–Boltzmann / Budyko–Sellers). |
-| `NeuralLinearLW` | neural, linear | Neural network predicts `a, b` per layer. |
+| `NeuralLinearLW` | neural, linear | Neural network predicts `a, b` per layer column wise. |
 | `NeuralABRLW` | neural, column | Emulates `AnalyticBandRadiation.jl` column-wise. |
 | `NeuralABRLWGlobal` | neural, global | Grid-wide variant of the ABR emulator, designed for GPU execution. |
 
@@ -37,7 +35,7 @@ Network architectures (`MLPConfig`, …) are pluggable via the `architectures/` 
 ```
 src/
   architectures/      # neural network configs (MLP, RNN)
-  parameterizations/  # longwave radiation schemes (linear, ABR)
+  parameterizations/  # parameterization schemes (linear, ABR)
   training/           # online training loop, gradients, run config
   utils/              # stats (z-score, scaling), io, metrics, plotting
 scripts/stats/        # precompute normalization statistics -> data/stats/*.jld2
