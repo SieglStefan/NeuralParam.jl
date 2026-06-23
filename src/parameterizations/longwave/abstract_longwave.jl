@@ -9,6 +9,7 @@
 #           - NeuralLinearLW
 #       - AbstractABRLW                 # schemes emulating AnalyticBandRadiation.jl
 #           - NeuralABRLW
+#           - NeuralABRLWGlobal
 
 
 

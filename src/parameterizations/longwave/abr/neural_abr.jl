@@ -4,49 +4,89 @@
 
 
 
-# NeuralABRLW parameterization object
-struct NeuralABRLW{M,P,S,C,V} <: AbstractABRLW
+# NeuralABRLW parameterization
+struct NeuralABRLW{C,Z,M,P,S,V} <: AbstractABRLW
+    n_in::Int           # input dimension of neural network
+    n_out::Int          # output -//-
+
+    arch_config::C      # architecture configuration of scheme
+
+    zscore::Z           # loaded zscore parameters
+
     nn::M               # neural network (Lux)
     ps::P               # parameters of the NN (Lux)
     st::S               # state of the NN (Lux)
-    config::C           # configuration of the NN
+
     input_buffer::V     # input buffer to avoid allocation
 end
 
 
-# Constructor for creating Lux NN architecture and parameters
+# Constructor for creating Lux nn architecture and parameters
 function NeuralABRLW(
-    config::NeuralABRLWConfig;
+    spectral_grid::SpectralGrid,
+    arch_config;
+    zscore_file = nothing,
     rng = Random.default_rng(),
 )
 
+    # Extract number of vertical layers
+    nlayers = spectral_grid.nlayers
+    arch = spectral_grid.architecture
+
+    # Calculate nn input dimensionnlayers
+    # - temperature profile:        nlayers
+    # - humidity profile:           nlayers
+    # - surface_pressure:           1
+    # - sea_surface_temperature:    1
+    # - land_surface_temperature:   1
+    # - land_fraction:              1
+    n_in = 2*nlayers + 4
+
+    # Calculate nn output dimension
+    # - temperature tendencies:     nlayers
+    n_out = nlayers
+
+
+    # Load zscore statistics
+    if isnothing(zscore_file)
+        file = "zscore_abrlw_L$(nlayers).jld2"
+    else
+        file = zscore_file
+    end
+
+    zscore = ZScoreStats(file, arch)
+
+
     # Create nn architecture
-    nn, ps, st = setup_nn(
-        config.nn_config,
-        config.n_in, 
-        config.n_out,
-        rng
+    nn, ps, st = setup_arch(arch_config, n_in, n_out, rng)
+
+
+    # Create empty input buffer
+    input_buffer = zeros(Float32, n_in)
+
+
+    return NeuralABRLW(
+        n_in, n_out,
+        arch_config,
+        zscore,
+        nn, ps, st,
+        input_buffer
     )
-
-    # Create input buffer
-    input_buffer = zeros(Float32, config.n_in)
-
-    return NeuralABRLW(nn, ps, st, config, input_buffer)
 end
 
 
 
 # Initializing function for SpeedyWeather (nothing is needed here yet)
-function SpeedyWeather.initialize!(::NeuralABRLW, ::SpeedyWeather.AbstractModel)
+function SpeedyWeather.initialize!(::NeuralABRLW, ::PrimitiveEquation)
     return nothing
 end
 
 
-# SpeedyWeather parameterization function for updating temperature tendencies
+# SpeedyWeather parameterization function for updating temperatureand flux tendencies
 Base.@propagate_inbounds function SpeedyWeather.parameterization!(
     ij,
     vars::SpeedyWeather.Variables,
-    para::NeuralABRLW,
+    scheme::NeuralABRLW,
     model::SpeedyWeather.AbstractModel,
 )
 
@@ -54,50 +94,34 @@ Base.@propagate_inbounds function SpeedyWeather.parameterization!(
     nlayers = model.spectral_grid.nlayers
 
 
-    # XXX Extract and normalize NN input variables  
-    for k in 1:nlayers
-        
-        para.input_buffer[k] =          zscore(vars.grid.temperature[ij,k],                         # temperature
-                                            para.config.zscore.input_mean[k], 
-                                            para.config.zscore.input_std[k])
+    # Alias input buffer
+    X  = scheme.input_buffer
 
-        para.input_buffer[nlayers+k] =  zscore(vars.grid.humidity[ij,k],                            # humidity
-                                            para.config.zscore.input_mean[nlayers+k], 
-                                            para.config.zscore.input_std[nlayers+k])
+    # Extract input variables into input buffer
+    for k in 1:nlayers
+        X[k] = vars.grid.temperature[ij,k]
+        X[nlayers+k] =  vars.grid.humidity[ij,k]
     end
 
-    para.input_buffer[2*nlayers+1] =    zscore(vars.grid.pressure[ij],                              # surface pressure
-                                            para.config.zscore.input_mean[2*nlayers+1], 
-                                            para.config.zscore.input_std[2*nlayers+1])
-                                            
-    para.input_buffer[2*nlayers+2] =    zscore(vars.prognostic.ocean.sea_surface_temperature[ij],   # sea surface temperature
-                                            para.config.zscore.input_mean[2*nlayers+2], 
-                                            para.config.zscore.input_std[2*nlayers+2])
-                                            
-    para.input_buffer[2*nlayers+3] =    zscore( vars.prognostic.land.soil_temperature[ij,1],        # land surface temperature
-                                            para.config.zscore.input_mean[2*nlayers+3], 
-                                            para.config.zscore.input_std[2*nlayers+3])                                            
+    X[2*nlayers+1] = vars.grid.pressure[ij]                              
+    X[2*nlayers+2] = vars.prognostic.ocean.sea_surface_temperature[ij]                                       
+    X[2*nlayers+3] = vars.prognostic.land.soil_temperature[ij,1]
+    X[2*nlayers+4] = model.land_sea_mask.mask[ij]
 
-    para.input_buffer[2*nlayers+4] =    zscore(model.land_sea_mask.mask[ij],                        # land fraction
-                                            para.config.zscore.input_mean[2*nlayers+4], 
-                                            para.config.zscore.input_std[2*nlayers+4])
-    
-    
+
+    # Normalize input variables
+    X .= zscore.(X, scheme.zscore.input_mean, scheme.zscore.input_std)
+
     # Lux forward pass
-    y, _ = Lux.apply(
-        para.nn,
-        para.input_buffer,
-        para.ps,
-        para.st
-    )
+    Y, _ = Lux.apply(scheme.nn, X, scheme.ps, scheme.st)
 
-    # Renormalize and update temperature tendencies
+    # Renormalize output variables
+    Y .= inv_zscore.(Y, scheme.zscore.output_mean, scheme.zscore.output_std)
+
+
+    # Update temperature tendencies
     for k in 1:nlayers
-
-        mean_k = para.config.zscore.output_mean[k]
-        std_k = para.config.zscore.output_std[k]
-
-        vars.tendencies.grid.temperature[ij, k] += inv_zscore(y[k], mean_k, std_k)
+        vars.tendencies.grid.temperature[ij, k] += Y[k]
     end
 
     return nothing

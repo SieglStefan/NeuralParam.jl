@@ -1,73 +1,107 @@
+### Trains a parameterization online in SpeedyWeather,jl
+###
+### Algorithm:
+###     
+###     - Initialize containers, optimiser and training data saving
+###     - Initialize target and training simulation:        sim_target and sim_train
+###     - Create a template simulation for copying:         sim_template
+###     
+###     - Loop over initial conditions: n_ic
+###         - Copy sim_template and perturb it:             sim_pert
+###         - Spinup sim_pert
+###         - Copy sim_pert for reference:                  sim_ref
+###
+###         - Loop over trajectories: n_traj
+###             - Copy sim_ref onto sim_target and sim_train
+###             - Propagate sim_target for n_steps steps
+###
+###             - Loop over epochs: n_epochs
+###                 - Update radiation scheme parameters
+###                 - Propagate sim_train for n_steps
+###                 - Calculate gradients
+###                 - Store training data
+###
+###             - Propagate sim_ref for n_gap steps
+###
+###         - Update learning rate
 
 
 
+# Function for running a online training
 function training_online(;
-        lw_radiation,
-        spectral_grid,
-        training_config,
-        target_lw_radiation,
-        printing_ic,
-        printing_traj,
-        printing_epochs,
-        name,
-        log,
-        train_dir,
-        test_mode
-    )
+    spectral_grid,
+    lw_radiation_train,
+    lw_radiation_target,
+    run_config,
+    output_config,
+    save_path,
+    test_mode
+)
 
+    # Unpack config parameters
     (; eta0, eta_decay, patience, min_delta,
-    t_spinup, n_ic, n_traj, n_epochs, n_gap, n_steps,
-    fac_pert_T, fac_pert_q) = training_config
+    t_spinup, 
+    n_ic, n_traj, n_epochs, n_steps, n_gap,
+    fac_pert_T, fac_pert_q) = run_config
+
+    (; printing_ic, printing_traj, printing_epochs,
+    train_save, train_file,
+    plotting) = output_config
 
 
-    # Containers for logging
-    L = Float32[]       # loss
-    PN = Float32[]      # parameter norm
-    GN = Float32[]      # gradient norm
-
-
-    # Setup optimiser
+    ## Setup optimiser
     eta = eta0
 
     rule = Optimisers.Adam(eta)
-    opt_state = Optimisers.setup(rule, lw_radiation.ps)
+    opt_state = Optimisers.setup(rule, lw_radiation_train.ps)
 
+    # Define variables for training control
     best_loss = 1000f0
+    loss_ic_mean = 0f0
     stale = 0
-    best_ps = deepcopy(lw_radiation.ps)
+    best_ps = deepcopy(lw_radiation_train.ps)
 
+
+    # Create target and training simulation and do a first timestep (initalize implicit solver)
+    model_target = isnothing(lw_radiation_target) ?
+        PrimitiveWetModel(; spectral_grid) :
+        PrimitiveWetModel(; spectral_grid, longwave_radiation = lw_radiation_target)
+    sim_target   = initialize!(model_target)
+    SpeedyWeather.initialize!(sim_target, steps=0)
+    SpeedyWeather.first_timesteps!(sim_target)
+
+    model_train  = PrimitiveWetModel(; spectral_grid, longwave_radiation = lw_radiation_train)
+    sim_train    = initialize!(model_train)
+    SpeedyWeather.initialize!(sim_train, steps=0)
+    SpeedyWeather.first_timesteps!(sim_train)
 
     # Create template model and simulationfor later copying
     model_template = PrimitiveWetModel(; spectral_grid)
     sim_template = initialize!(model_template)
 
 
-    # Create target and training simulation and do a first timestep for later unchanged model fields
-    model_target = isnothing(target_lw_radiation) ?
-        PrimitiveWetModel(; spectral_grid) :
-        PrimitiveWetModel(; spectral_grid, longwave_radiation = target_lw_radiation)
-    sim_target   = initialize!(model_target)
-    SpeedyWeather.initialize!(sim_target, steps=0)
-    SpeedyWeather.first_timesteps!(sim_target)
+    # Prepare containers for logging
+    L = Float32[]       # loss
+    PN = Float32[]      # parameter norm
+    GN = Float32[]      # gradient norm
 
-    model_train  = PrimitiveWetModel(; spectral_grid, longwave_radiation = lw_radiation)
-    sim_train    = initialize!(model_train)
-    SpeedyWeather.initialize!(sim_train, steps=0)
-    SpeedyWeather.first_timesteps!(sim_train)
-
-
-    # Print some information
-    @info "Online training started!"
-    print_config(training_config, 2*model_template.time_stepping.Δt_sec)
-    
-    # XXX
-    if log
-        path = joinpath(train_dir, "$name.csv")
-        io = open(path, "w")
-
-        println(io, "ic,traj,epoch,loss,eta,pnorm,gnorm") 
-        flush(io)
+    # Initalize .csv file for logging
+    if train_save
+        meta = build_meta(lw_radiation_train, run_config)
+        csv_init(meta; path=save_path, file=train_file)
     end
+
+
+    # Print training start information
+    @info "Online training started!"
+    print_config(run_config, 2*model_template.time_stepping.Δt_sec)
+
+    # Warn when running without autodiff
+    if test_mode
+        @warn "Test mode is activated! Enzyme.autodiff is NOT used!"
+    end
+
+
 
     # Loop over initial conditions
     for ic in 1:n_ic
@@ -78,8 +112,8 @@ function training_online(;
         sim_pert = deepcopy(sim_template)
 
         # Perturb temperature and humidity fields
-        perturb_grid_field!(sim_pert, :temperature, fac_add = fac_pert_T)
-        perturb_grid_field!(sim_pert, :humidity, fac_mult = fac_pert_q, zeromin = true)
+        perturb_grid_field!(sim_pert, :temperature; fac_add = fac_pert_T)
+        perturb_grid_field!(sim_pert, :humidity; fac_mult = fac_pert_q, zeromin = true)
         
         # Spinup simulation 
         run!(sim_pert, period = Hour(t_spinup))
@@ -116,7 +150,7 @@ function training_online(;
                 ### Prepare training simulation
             
                 # Re-create training simulation with updated radiation
-                sim_train = @set sim_train.model.longwave_radiation = lw_radiation
+                sim_train = @set sim_train.model.longwave_radiation = lw_radiation_train
 
                 # Set training variables to reference variables
                 copy!(sim_train.variables, vars0)
@@ -125,15 +159,15 @@ function training_online(;
                 sim_timesteps!(sim_train, n_steps)
 
 
-
                 # Print information of starting first training step
                 if ic == 1 && traj== 1 && epoch == 1
                     @info "Start 1st training step!"
                 end
 
+
                 # Perform one training step
-                lw_radiation, loss, grads, ps_new, opt_state = online_training_step(
-                    lw_radiation;
+                lw_radiation_train, loss, grads, ps_new, opt_state = online_training_step(
+                    lw_radiation_train;
                     vars0,
                     sim_target,
                     sim_train,
@@ -148,9 +182,12 @@ function training_online(;
                 push!(PN, Float32(tree_l2norm(ps_new)))
                 push!(GN, Float32(tree_l2norm(grads)))
 
-                if log
-                    println(io, "$ic, $traj, $epoch, $(L[end]), $eta, $(PN[end]), $(GN[end])")
-                    flush(io)
+                # Write to .csv
+                if train_save
+                    csv_row!(
+                        ic, traj, epoch, L[end], eta, PN[end], GN[end];
+                        path=save_path, file=train_file
+                    )
                 end
                     
 
@@ -159,7 +196,6 @@ function training_online(;
                     print_epochs(epoch, L[end], PN[end], GN[end])
                 end
             end
-
 
 
             # Propagate reference trajectory forward
@@ -174,13 +210,16 @@ function training_online(;
             end
         end
 
+
         # Update learning rate
         eta *= eta_decay
         Optimisers.adjust!(opt_state, eta)
 
-        if L[end] < best_loss - min_delta
-            best_loss = L[end]
-            best_ps = deepcopy(lw_radiation.ps)
+        loss_ic_mean = mean(L[end-n_traj*n_epochs+1:end])
+
+        if loss_ic_mean < best_loss - min_delta
+            best_loss = loss_ic_mean
+            best_ps = deepcopy(lw_radiation_train.ps)
             stale = 0
         else
             stale += 1
@@ -190,24 +229,28 @@ function training_online(;
             end
         end
 
+
         # Print IC update
         if printing_ic
             print_ic(ic, L[end], PN[end], GN[end])
         end
+
+        # Plot current loss trajectory after every ic
+        if plotting
+            display(plot_training(L, PN, GN))
+        end
     end 
     
-    println("Training finished!")
+    @info "Training finished!"
 
-    log && close(io)
-
-    return update_ps(lw_radiation, best_ps), L, PN, GN
+    return update_ps(lw_radiation_train, best_ps), L, PN, GN
 end
 
 
 
 # Function for performing one training step
 function online_training_step(
-    lw_radiation;
+    lw_radiation_train;
     vars0,
     sim_target,
     sim_train,
@@ -226,36 +269,37 @@ function online_training_step(
     )
 
     # Update parameters
-    opt_state, ps_new = Optimisers.update(opt_state, lw_radiation.ps, grads)
-    lw_radiation_new = update_ps(lw_radiation, ps_new)
-
+    opt_state, ps_new = Optimisers.update(opt_state, lw_radiation_train.ps, grads)
+    lw_radiation_new = update_ps(lw_radiation_train, ps_new)
 
     return lw_radiation_new, loss, grads, ps_new, opt_state
 end
 
 
-function update_ps(lw::NeuralLinearLW, ps_new)
-    return NeuralLinearLW(lw.nn, ps_new, lw.st, lw.config, lw.input_buffer)
-end
 
-
+# Helper function for updating parameterization parameters
 function update_ps(lw::ConstLinearLW, ps_new)
-    return ConstLinearLW(ps_new, lw.config)
+    return ConstLinearLW(lw.scaling, ps_new)
 end
 
+# Helper function for updating parameterization parameters
+function update_ps(lw::NeuralLinearLW, ps_new)
+    return NeuralLinearLW(lw.n_in, lw.n_out, lw.arch_config, lw.zscore, lw.scaling, lw.nn, ps_new, lw.st, lw.input_buffer)
+end
+
+# Helper function for updating parameterization parameters
 function update_ps(lw::NeuralABRLW, ps_new)
-    return NeuralABRLW(lw.nn, ps_new, lw.st, lw.config, lw.input_buffer)
+    return NeuralABRLW(lw.n_in, lw.n_out, lw.arch_config, lw.zscore, lw.nn, ps_new, lw.st, lw.input_buffer)
+end
+
+# Helper function for updating parameterization parameters
+function update_ps(lw::NeuralABRLWGlobal, ps_new)
+    return NeuralABRLWGlobal(lw.n_in, lw.n_out, lw.n_points, lw.arch_config, lw.zscore, lw.nn, ps_new, lw.st)
 end
 
 
 
-
-
-
-
-
-
-# Propagate a simulation for n_steps using the leapfrog timestep size
+# Propagate a simulation for n_steps using a leapfrog timestep!()
 function sim_timesteps!(sim, n_steps)
 
     # Extract time stepping
@@ -268,6 +312,3 @@ function sim_timesteps!(sim, n_steps)
 
     return nothing
 end
-
-
-

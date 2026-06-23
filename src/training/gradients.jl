@@ -24,8 +24,9 @@ function compute_gradients(
     para = sim_train.model.longwave_radiation
 
 
-    # Copy initial variables, so timestep! does not mutate vars0
-    vars_ad = deepcopy(vars0)
+    # Start AD from sim_train's variables (carry nn_input etc.), reset state to the IC
+    vars_ad = deepcopy(sim_train.variables)
+    copy!(vars_ad, vars0)
 
     # Define and seed gradient container for autodiff
     bvars_ad = make_zero(vars_ad)

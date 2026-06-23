@@ -1,7 +1,7 @@
 ### ConstLinearLW parameterization
 ###
-### - Simple baseline scheme using global constant a and b per for calculating linear    
-###     tendencies dT_k = a_k * T_k + b_k, where k indices labels vertical layers.
+### - Simple baseline scheme using global constant a and b per layer for calculating linear    
+###     tendencies dT_k = a_k * T_k + b_k, where k labels vertical layers.
 ### - a and b vary only in the vertical.
 ### - Inspired by the Budyko-Sellers model (linearization of Stefan–Boltzmann law)
 
@@ -9,23 +9,38 @@
 
 # ConstLinearLongwave parameterization
 struct ConstLinearLW{P} <: AbstractLinearLW
-    ps::P
-    config::ConstLinearLWConfig             # parameterization config
+    scaling::Scaling        # scaling factors, used for normalized gradients
+    
+    ps::P                   # parameters a and b
 end
 
 
 # Convenience constructor
-function ConstLinearLW(config::ConstLinearLWConfig)
-    nlayers= length(config.sc_a)
-    ps= (; a=zeros(Float32, nlayers), b=zeros(Float32, nlayers))
+function ConstLinearLW(
+    spectral_grid::SpectralGrid;
+    user_scaling = nothing
+)
+
+    # Extract number of vertical layers
+    nlayers = spectral_grid.nlayers
+
+    # Decide scaling (per-layer constant defaults)
+    if isnothing(user_scaling)
+        scaling = Scaling(nlayers)
+    else
+        scaling = user_scaling
+    end
+
+    # Setup parameter field
+    ps = (; a = -ones(Float32, nlayers), b = ones(Float32, nlayers))
     
-    return ConstLinearLW(ps, config)
+    return ConstLinearLW(scaling, ps)
 end
 
 
 
 # Initializing function for SpeedyWeather (nothing is needed here yet)
-function SpeedyWeather.initialize!(::ConstLinearLW, ::SpeedyWeather.AbstractModel)
+function SpeedyWeather.initialize!(::ConstLinearLW, ::PrimitiveEquation)
     return nothing
 end
 
@@ -34,18 +49,18 @@ end
 Base.@propagate_inbounds function SpeedyWeather.parameterization!(
     ij,
     vars::SpeedyWeather.Variables,
-    para::ConstLinearLW,
+    scheme::ConstLinearLW,
     model::SpeedyWeather.AbstractModel,
 )
 
     # Extract number of vertical layers
     nlayers = model.spectral_grid.nlayers
 
-    # Loop over vertical layers and update temperature tendencies
+    # Update temperature tendencies
     for k in 1:nlayers
         
-        ak = para.ps.a[k] * para.config.sc_a[k]
-        bk = para.ps.b[k] * para.config.sc_b[k]
+        ak = scheme.ps.a[k] * scheme.scaling.sc_a[k]
+        bk = scheme.ps.b[k] * scheme.scaling.sc_b[k]
 
         dTk = ak * vars.grid.temperature[ij,k] + bk
 

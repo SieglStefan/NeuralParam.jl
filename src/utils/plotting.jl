@@ -1,151 +1,222 @@
-### Plotting utilities
+### Plotting utility functions
 ###
-### Helper functions for visualizing losses, training diagnostics,
-### temperature-field comparisons, and heatmaps.
+### Plotting possibilities:
+### - plot_loss:        
+###         plots loss of a training run
+### - plot_training:    
+###         plots not only loss, but also parameter and gradient norm
+### - plot_training_comp:
+###         plots a loss comparison for several training runs
+### - plot_comparison:
+###         plots a compairson between two fields in respect to a given metric
+### - plot_heatmap:
+###         plots a single heatmap
+### - plot_heatmaps:
+###         plots 3 heatmaps with a shared colorbar
 
 
 
-# Plot training diagnostics for NeuralLinearLongwave variants
+# Plot timeseries of loss of a training run
+function plot_loss(loss::AbstractVector; kwargs...)
+
+    return Plots.plot(
+        loss;
+        xlabel = "Training step",
+        ylabel = "Loss",
+        yscale = :log10,
+        title = "Loss over Training steps",
+        lw = 2,
+        kwargs...
+    )
+end
+
+# Plot timeseries of loss of a training run from .csv file
+function plot_loss(; path="", file="", kwargs...)
+    
+    # Read and extract data
+    df = csv_read(;path, file)
+    loss = df.loss
+    
+    return plot_loss(loss; kwargs...)
+end
+
+
+
+# Plot timeseries of loss, parameter- and gradient norm of a training run
 function plot_training(
-    L, PN, GN;
+    loss::AbstractVector,
+    pnorm::AbstractVector,
+    gnorm::AbstractVector;
     loss_kwargs = (;),
     pnorm_kwargs = (;),
     gnorm_kwargs = (;),
     plot_kwargs = (;),
 )
+
+    # Loss plot
     p1 = Plots.plot(
-        0:length(L)-1,
-        L;
-        yscale = :log10,
+        loss;
         ylabel = "Loss",
-        title = "Loss evolution",
+        yscale = :log10, 
         loss_kwargs...,
     )
 
+    # Parameter norm plot
     p2 = Plots.plot(
-        0:length(PN)-1,
-        PN;
-        yscale = :log10,
-        ylabel = "|p|",
-        title = "Parameter norm",
+        pnorm;
+        ylabel = "Parameter norm",
+        yscale = :log10, 
         pnorm_kwargs...,
     )
 
+    # Gradient norm plot
     p3 = Plots.plot(
-        0:length(GN)-1,
-        GN;
-        yscale = :log10,
-        xlabel = "Training step",
-        ylabel = "|g|",
-        title = "Gradient norm",
+        gnorm;
+        xlabel="Training step",
+        ylabel="Gradient norm",
+        yscale=:log10, 
         gnorm_kwargs...,
     )
 
-    p = Plots.plot(p1, p2, p3; layout = (3, 1), plot_kwargs...)
-    display(p)
+    return Plots.plot(p1, p2, p3; layout=(3, 1), title="Training Values", plot_kwargs...)
+end
 
-    return p
+# Plot timeseries of loss, parameter- and gradient norm of a training run from file
+function plot_training(; path="", file="", kwargs...)
+    
+    # Read and extract data
+    df = csv_read(;path, file)
+
+    loss = df.loss
+    pnorm = df.pnorm
+    gnorm = df.gnorm
+    
+    return plot_training(loss, pnorm, gnorm; kwargs...)
 end
 
 
 
-# Plot only the loss
-function plot_loss(L; kwargs...)
+# Plot timeseries of loss comparison of two training runs
+function plot_training_comp(losses::AbstractVector{<:AbstractVector}; labels=nothing, kwargs...)
+
+    # Create empty canvas
     p = Plots.plot(
-        0:length(L)-1,
-        L;
-        yscale = :log10,
-        xlabel = "Step",
+        xlabel = "Training step",
         ylabel = "Loss",
-        title = "Loss evolution",
-        kwargs...,
+        yscale = :log10,
+        title = "Loss Comparison",
     )
 
-    display(p)
-
-    return p
-end
-
-
-
-# Plot metric-based differences between target and comparison trajectories
-function plot_comparison(
-    T_target,
-    T_comp;
-    metric = rmse,
-    Δt_sec,
-    labels = nothing,
-    kwargs...,
-)
-    # Time axis in days
-    t_days = (0:length(T_target)-1) .* Δt_sec ./ (60 * 60 * 24)
-
-    # Default labels
-    labels = labels === nothing ? ["T_comp_$i" for i in eachindex(T_comp)] : labels
-
-    p = Plots.plot(;
-        xlabel = "Time (days)",
-        ylabel = uppercase(string(metric)),
-        title = "Temperature evolution comparison",
-        legend = :topleft,
-        kwargs...,
-    )
-
-    for (i, comp) in enumerate(T_comp)
-        values = metric.(T_target, comp)
-        Plots.plot!(p, t_days, values; label = labels[i])
+    # Plot losses
+    for (i, loss) in enumerate(losses)
+        lab = isnothing(labels) ? "run $i" : labels[i]
+        Plots.plot!(p, loss; label=lab, lw=2)
     end
 
-    display(p)
-
-    return p
+    return Plots.plot(p; kwargs...)
 end
 
+# Plot timeseries of loss comparison of two training runs from file
+function plot_training_comp(runs::AbstractVector{<:Tuple}; labels=nothing, kwargs...)
+
+    # Read and extract data
+    losses = [csv_read(; path=p, file=f).loss for (p,f) in runs]
+    labs = isnothing(labels) ? [f for (_,f) in runs] : labels
+
+    return plot_training_comp(losses; labels=labs, kwargs...)
+end  
+
+
+
+# Plot timeseries of two fields in respect to a given metric
+function plot_comparison(
+    target::NamedTuple,
+    comp::NamedTuple;
+    metric = rmse,
+    Δt_sec,
+    kwargs...,
+)
+    fields = keys(target)
+
+    panels = map(enumerate(fields)) do (i, field)
+        traj_t = target[field]
+        traj_c = comp[field]
+        t_days = (0:length(traj_t)-1) .* Δt_sec ./ (60 * 60 * 24)
+
+        xlab = i == length(fields) ? "Time (days)" : ""
+        Plots.plot(t_days, metric.(traj_t, traj_c);
+                   ylabel = string(field), xlabel = xlab, legend = false)
+    end
+
+    return Plots.plot(
+        panels...;
+        layout = (length(panels), 1),
+        plot_title = "Comparison ($(uppercase(string(metric))))",
+        kwargs...,
+    )
+end
+
+
+
+# Helper functions for creating a coastline
+function field_to_lonlatmat(field)
+    full = RingGrids.interpolate(RingGrids.full_grid_type(field.grid), field.grid.nlat_half, field)
+    return RingGrids.get_lond(full), RingGrids.get_latd(full), Matrix(full)
+end
+
+shift_lon(lond, mat) = (lon = [l > 180 ? l - 360 : l for l in lond]; p = sortperm(lon); (lon[p], mat[p, :]))
+
+finite_range(mats) = (v = filter(isfinite, vcat(vec.(mats)...)); (minimum(v), maximum(v)))
 
 
 # Plot a single heatmap
-function plot_heatmap(
-    F;
-    title = "Heatmap",
-    kwargs...,
-)
-    fig = CairoMakie.heatmap(
-        F;
-        title,
-        kwargs...,
-    )
+function plot_heatmap(field; title = "Heatmap", coastlines = true, grid = false, kwargs...)
+    lond, latd, mat = field_to_lonlatmat(field)
+    fig = CairoMakie.Figure()
 
-    display(fig)
+    if coastlines
+        lon, mat = shift_lon(lond, mat)
+        ax = GeoMakie.GeoAxis(fig[1, 1]; dest = "+proj=longlat", title = title, width = 500, height = 250,
+                              xgridvisible = grid, ygridvisible = grid)
+        hm = CairoMakie.heatmap!(ax, lon, latd, mat; kwargs...)
+        CairoMakie.lines!(ax, GeoMakie.coastlines(); color = :black)
+    else
+        ax = CairoMakie.Axis(fig[1, 1]; title = title, width = 500, height = 250,
+                             xgridvisible = grid, ygridvisible = grid)
+        hm = CairoMakie.heatmap!(ax, lond, latd, mat; kwargs...)
+    end
 
+    CairoMakie.Colorbar(fig[1, 2], hm)
+    CairoMakie.resize_to_layout!(fig)
     return fig
 end
 
 
+# Plot a multiple heatmaps with a shared colorbar
+function plot_heatmaps(F_vec; titles = nothing, layout = :vertical, coastlines = true, grid = false, kwargs...)
+    n      = length(F_vec)
+    titles = isnothing(titles) ? ["Heatmap $i" for i in 1:n] : titles
+    conv   = [field_to_lonlatmat(F) for F in F_vec]
+    crange = finite_range([c[3] for c in conv])
 
-# Plot several heatmaps with common colorbar scaling
-function plot_heatmaps(
-    F_vec;
-    titles = nothing,
-    kwargs...,
-)
-    cmin = minimum(minimum.(F_vec))
-    cmax = maximum(maximum.(F_vec))
-    crange = (cmin, cmax)
-
-    titles = titles === nothing ? ["Heatmap $i" for i in eachindex(F_vec)] : titles
-
-    fig_vec = []
-
-    for (i, F) in enumerate(F_vec)
-        fig = plot_heatmap(
-            F;
-            title = titles[i],
-            colorrange = crange,
-            kwargs...,
-        )
-
-        push!(fig_vec, fig)
+    fig = CairoMakie.Figure()
+    hm  = nothing
+    for (i, (lond, latd, mat)) in enumerate(conv)
+        pos = layout == :vertical ? fig[i, 1] : fig[1, i]
+        if coastlines
+            lon, mat = shift_lon(lond, mat)
+            ax = GeoMakie.GeoAxis(pos; dest = "+proj=longlat", title = titles[i], width = 500, height = 250,
+                                  xgridvisible = grid, ygridvisible = grid)
+            hm = CairoMakie.heatmap!(ax, lon, latd, mat; colorrange = crange, kwargs...)
+            CairoMakie.lines!(ax, GeoMakie.coastlines(); color = :black)
+        else
+            ax = CairoMakie.Axis(pos; title = titles[i], width = 500, height = 250,
+                                 xgridvisible = grid, ygridvisible = grid)
+            hm = CairoMakie.heatmap!(ax, lond, latd, mat; colorrange = crange, kwargs...)
+        end
     end
 
-    return fig_vec
+    layout == :vertical ? CairoMakie.Colorbar(fig[:, 2], hm) : CairoMakie.Colorbar(fig[1, n+1], hm)
+    CairoMakie.resize_to_layout!(fig)
+    return fig
 end

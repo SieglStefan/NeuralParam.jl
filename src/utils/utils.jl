@@ -1,8 +1,8 @@
 ### General utility functions
 ###
-### Small helper functions used across scripts and analysis code.
+### Helper functions used across
 
 
 
-# Extract vertical layer k from a series of temperature fields
-extract_layer(k, T) = [Ti[:, k] for Ti in T]
+# Extract vertical layer k from a series of fields
+extract_layer(layer, f) = [i[:, layer] for i in f]

@@ -1,36 +1,32 @@
 ### Metrics and norm utilities
 ###
-### This file contains scalar validation metrics for temperature fields
-### and tree norm utilities for parameters/gradients.
+### Helper functions for evaluation data
 
 
 
-# Root mean squared error metric
+# Root mean squared error
 function rmse(x, y)
     return sqrt(sum((y .- x).^2) / length(x))
 end
 
-
-# Bias metric
+# Bias
 function bias(x, y)
     return sum(y .- x) / length(x)
 end
 
-
-# Correlation metric
+# Correlation
 function correlation(x, y)
     return cor(vec(x), vec(y))
 end
 
-
-# Maximal absolute difference metric
+# Maximal absolute difference
 function maxdiff(x, y)
     return maximum(abs.(y .- x))
 end
 
 
 
-# Recursive squared L2 norm for numbers, arrays, tuples, and NamedTuples
+# Recursive squared L2 norms
 tree_l2sum(x::Number) = abs2(x)
 tree_l2sum(x::AbstractArray) = sum(abs2, x)
 tree_l2sum(x::Tuple) = sum(tree_l2sum, x)

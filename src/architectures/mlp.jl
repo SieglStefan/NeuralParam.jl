@@ -1,26 +1,28 @@
 ### Multi Layer Perceptron architecture
+###
+### Defining struct and helper setup function
 
 
 
 # MLP configuration struct
-@kwdef struct MLPConfig{A} <: AbstractNNConfig
-    n_hidden::Int = 2       # number of hidden layers
-    width::Int = 16         # width of neural network
+@kwdef struct MLPConfig{A} <: AbstractArchConfig
+    n_hidden::Int = 2           # number of hidden layers
+    width::Int = 16             # width of neural network
     
-    act::A = tanh              # XXX activation function
+    act::A = Lux.leakyrelu          # activation function
 end
 
 
-# Function for setting up a MLP
-function setup_nn(
-    nn_config::MLPConfig,
+# Setting up MLP architecture
+function setup_arch(
+    arch_config::MLPConfig,
     n_in::Int,
     n_out::Int,
     rng = Random.default_rng(),
 )
 
     # Extract nn architecture parameters
-    (; n_hidden, width, act) = nn_config
+    (; n_hidden, width, act) = arch_config
 
 
     # Build nn

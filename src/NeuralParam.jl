@@ -9,8 +9,11 @@ using Optimisers
 using Enzyme
 using Checkpointing
 
-using Random
 using JLD2
+using CSV
+using DataFrames
+
+using Random
 using Dates
 using Statistics
 
@@ -21,17 +24,29 @@ using RingGrids
 
 using Accessors
 
+using Adapt
+using CUDA
+using cuDNN
+using MLDataDevices: cpu_device, gpu_device
+
 
 export  
         ### utils
-        # utils.jl
-                extract_layer,
-        # stats.jl
-                zscore,
-                inv_zscore,
-                ZScoreStats,
-                load_zscore,
-                load_output_scaling,
+        # data.jl
+                perturb_grid_field!,
+        # device.jl
+                        #to_cpu,
+        # io.jl
+                save,
+                load,
+                        #load_stats,
+                        #csv_init,
+                        #csw_row!,
+                csv_info,
+                        #csv_read,
+                        #arch_meta,
+                        #meta_scheme,
+                        #build_meta,
         # metrics.jl
                 rmse,
                 bias,
@@ -39,88 +54,101 @@ export
                 maxdiff,
                 tree_l2sum,
                 tree_l2norm,
-        # io.jl
-                save_longwave,
-                load_longwave,
-        # printing.jl
-                print_ic,
-                print_traj,
-                print_epoch,
-                print_config,      
         # plotting.jl
-                # XXX
-        # data.jl
-                perturb_grid_field!,
+                plot_loss,
+                plot_training,
+                plot_training_comp,
+                plot_comparison,
+                        #field_to_lonlatmat,
+                plot_heatmap,
+                plot_heatmaps,
+        # printing.jl
+                        #print_ic,
+                        #print_traj,
+                        #print_epochs,
+                print_config,    
+        # stats.jl
+                Scaling,
+                zscore,
+                inv_zscore,
+                ZScoreStats,
+        # utils.jl
+                extract_layer,
+
+
+        ### architectures
+        # abstract_arch.jl
+                        #AbstractArchConfig,
+        # mlp.jl
+                MLPConfig,
+                        #setup_arch,
+        # rnn.jl
+                # ---
 
         ### parameterizations
-        # ConstLinearLW
-                ConstLinearLWConfig,
+        # const_linear.jl
                 ConstLinearLW,
-        # NeuralLinearLW
-                NeuralLinearLWConfig,
+        # neural_linear.jl
                 NeuralLinearLW,
-        # NeuralABRLWConfig
-                NeuralABRLWConfig,
+        # neural_abr.jl
                 NeuralABRLW,
+        # neural_abr_global.jl
+                NeuralABRLWGlobal,
 
-        ### models
-        #mlp.jl
-                MLPConfig,
-                setup_nn,
 
         ### training
+        # config.jl
+                RunConfig,
+                OutputConfig,
         # gradients.jl
-                compute_gradients,
-                checkpointed_timesteps!,
-                seed_loss!,
-        # training_config.jl
-                TrainingConfig,
+                        #compute_gradients,
+                        #checkpointed_timesteps!,
+                        #seed_loss!,
         # run_training.jl
-                run_training,
+                run_training
         # training_offline
-                # XXX
+                # ---
         # training_online
-                training_online,
-                online_training_step,
-                update_ps,
-                sim_timesteps!
+                        #training_online,
+                        #online_training_step,
+                        #update_ps,
+                        #sim_timesteps!
 
 
 
 
 
-# General utils
+# General utils (expect io, printing and device management)
 include("utils/utils.jl")
 include("utils/stats.jl")
 include("utils/metrics.jl")
-include("utils/io.jl")
-include("utils/printing.jl")
 include("utils/plotting.jl")
 include("utils/data.jl")
 
 
-
 # Models
-include("models/abstract_nn.jl")
-include("models/mlp.jl")
-include("models/rnn.jl")
-
+include("architectures/abstract_arch.jl")
+include("architectures/mlp.jl")
+include("architectures/rnn.jl")
 
 
 # Parameterizations
 include("parameterizations/longwave/abstract_longwave.jl")
-include("parameterizations/longwave/linear/const_linear_config.jl")
 include("parameterizations/longwave/linear/const_linear.jl")
-include("parameterizations/longwave/linear/neural_linear_config.jl")
 include("parameterizations/longwave/linear/neural_linear.jl")
-include("parameterizations/longwave/abr/neural_abr_config.jl")
 include("parameterizations/longwave/abr/neural_abr.jl")
+include("parameterizations/longwave/abr/neural_abr_global.jl")
 
+
+# IO, printing and device management
+include("utils/io.jl")
+include("utils/printing.jl")
+include("utils/device.jl")
 
 
 # Training infrastructure
 include("training/gradients.jl")
-include("training/training_config.jl")
+include("training/config.jl")
 include("training/training_online.jl")
 include("training/training_offline.jl")
 include("training/run_training.jl")
