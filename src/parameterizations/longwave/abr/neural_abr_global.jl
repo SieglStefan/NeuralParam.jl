@@ -1,13 +1,13 @@
 ### Global NeuralABRLW parameterization
 ###
 ### - Emulating the AnalyticBandRadiation.jl longwave parameterization
-### - Supports GPU usage
+### - Built for GPU usage
 ### - Acts as an global parameterization
 
 
 
 # Global NeuralABRLW parameterization
-struct NeuralABRLWGlobal{C,Z,M,P,S} <: AbstractABRLW
+struct NeuralABRLWGlobal{C,Z,M,P,S,F} <: AbstractABRLW
     n_in::Int           # input dimension of neural network
     n_out::Int          # output -//-
     n_points::Int       # number of columns of the grid
@@ -19,6 +19,10 @@ struct NeuralABRLWGlobal{C,Z,M,P,S} <: AbstractABRLW
     nn::M               # neural network (Lux)
     ps::P               # parameters of the NN (Lux)
     st::S               # state of the NN (Lux)
+
+    def_co2::F          # default co2 concentration, used if no co2 propagation
+    def_ocean_em::F     # default ocean emissivity
+    def_land_em::F      # default land emissivity 
 end
 
 
@@ -26,7 +30,10 @@ end
 function NeuralABRLWGlobal(
     spectral_grid::SpectralGrid,
     arch_config;
-    zscore_file = nothing,
+    zscore_folder = nothing,
+    def_co2 = 280f0,
+    def_ocean_em = 1f0,
+    def_land_em = 1f0,
     rng = Random.default_rng(),
 )
 
@@ -38,28 +45,32 @@ function NeuralABRLWGlobal(
     # Extract number of vertical layers
     nlayers = spectral_grid.nlayers
 
-    # Calculate nn input dimensionnlayers
+    # Calculate nn input dimension
     # - temperature profile:        nlayers
     # - humidity profile:           nlayers
     # - surface_pressure:           1
+    # - co2 concentration:          1
     # - sea_surface_temperature:    1
     # - land_surface_temperature:   1
     # - land_fraction:              1
-    n_in = 2*nlayers + 4
+    # - ocean emissivity:           1
+    # - land emissivity:            1
+    n_in = 2*nlayers + 7
 
     # Calculate nn output dimension
     # - temperature tendencies:     nlayers
-    n_out = nlayers
+    # - diag. fluxes:               2
+    n_out = nlayers + 2
 
 
     # Load zscore statistics
-    if isnothing(zscore_file)
-        file = "zscore_abrlw_L$(nlayers).jld2"
+    if isnothing(zscore_folder)
+        folder = "zscore_abrlw_L$(nlayers)"
     else
-        file = zscore_file
+        folder = zscore_folder
     end
 
-    zscore = ZScoreStats(file, arch)
+    zscore = ZScoreStats(folder, arch)
 
 
     # Create nn architecture
@@ -73,7 +84,8 @@ function NeuralABRLWGlobal(
         n_in, n_out, spectral_grid.npoints,
         arch_config,
         zscore,
-        nn, ps, st
+        nn, ps, st,
+        def_co2, def_ocean_em, def_land_em,
     )
 end
 
@@ -114,7 +126,8 @@ function Adapt.adapt_structure(to, s::NeuralABRLWGlobal)
         s.n_in, s.n_out, s.n_points,    # isbits
         s.arch_config,                  # isbits
         nothing,                        # zscore (column kernel no-op doesn't use it)
-        nothing, nothing, nothing       # nn, ps, st stripped (not isbits)
+        nothing, nothing, nothing,       # nn, ps, st stripped (not isbits)
+        s.def_co2, s.def_ocean_em, s.def_land_em,
     )
 end
 
@@ -136,21 +149,46 @@ function SpeedyWeather.parameterization!(
     nlayers = model.spectral_grid.nlayers
 
 
+
+    ### Extract variables
+    T = vars.grid.temperature_prev
+    q = vars.grid.humidity_prev
+    p = vars.grid.pressure_prev
+
+    if hasproperty(vars.prognostic, :greenhouse_gases) && haskey(vars.prognostic.greenhouse_gases, :co2)
+        co2 = vars.prognostic.greenhouse_gases.co2[]
+    else
+        co2 = scheme.def_co2
+    end
+
+    sst = vars.prognostic.ocean.sea_surface_temperature  
+    lst = @view vars.prognostic.land.soil_temperature[:,1]
+    land_fraction = model.land_sea_mask.mask
+    
+    ocean_em = scheme.def_ocean_em    # XXX SW does not propagate yet
+    land_em = scheme.def_land_em     # XXX SW does not propagate yet
+
+
+
     # Alias input scratch array
     X = vars.parameterizations.nn_input
 
-    # Extract input variables into scratch array
+    # Populate scratch array
     @views begin
         for k in 1:nlayers
-            X[k, :]          .= vars.grid.temperature[:,k]
-            X[nlayers+k, :]  .= vars.grid.humidity[:,k]
+            X[k, :]          .= T[:,k]
+            X[nlayers+k, :]  .= log10.(q[:,k] .+ 1f-9)
         end
 
-        X[2*nlayers+1, :]  .= vars.grid.pressure
-        X[2*nlayers+2, :]  .= vars.prognostic.ocean.sea_surface_temperature
-        X[2*nlayers+3, :]  .= vars.prognostic.land.soil_temperature[:,1]
-        X[2*nlayers+4, :]  .= model.land_sea_mask.mask
+        X[2*nlayers+1, :]  .= p
+        X[2*nlayers+2, :]  .= co2
+        X[2*nlayers+3, :]  .= sst
+        X[2*nlayers+4, :]  .= lst
+        X[2*nlayers+5, :]  .= land_fraction
+        X[2*nlayers+6, :]  .= ocean_em
+        X[2*nlayers+7, :]  .= land_em
     end
+
 
 
     # Normalize input variables (scalar zscore broadcast over the buffer)
@@ -163,6 +201,7 @@ function SpeedyWeather.parameterization!(
     Y .= inv_zscore.(Y, scheme.zscore.output_mean, scheme.zscore.output_std)
 
 
+
     # Extract array out of field
     dT = parent(vars.tendencies.grid.temperature)
 
@@ -170,6 +209,23 @@ function SpeedyWeather.parameterization!(
     @views for k in 1:nlayers
         dT[:,k] .+= Y[k,:]
     end
+
+    # Update diagnostic fluxes from nn
+    vars.parameterizations.outgoing_longwave .= @view Y[nlayers+1,:]
+    vars.parameterizations.surface_longwave_down .= @view Y[nlayers+2,:]
+
+
+
+    # Calculate and update analytical fluxes (same as in ABR, no nn needed)
+    σ_SB = model.atmosphere.stefan_boltzmann
+
+    U_sfc_ocean = ifelse.(isfinite.(sst), ocean_em .* σ_SB .* sst.^4, 0f0)
+    U_sfc_land  = ifelse.(isfinite.(lst), land_em  .* σ_SB .* lst.^4, 0f0)
+    U_sfc_bb    = (1 .- land_fraction) .* U_sfc_ocean .+ land_fraction .* U_sfc_land
+
+    vars.parameterizations.surface_longwave_up .= U_sfc_bb
+    vars.parameterizations.ocean.surface_longwave_up .= U_sfc_ocean
+    vars.parameterizations.land.surface_longwave_up .= U_sfc_land
 
     return nothing
 end

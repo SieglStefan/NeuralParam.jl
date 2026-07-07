@@ -36,6 +36,7 @@ function to_cpu(s::NeuralABRLWGlobal)
         s.n_in, s.n_out, s.n_points,
         s.arch_config,
         to_cpu(s.zscore),
-        s.nn, cpu_device()(s.ps), cpu_device()(s.st)
+        s.nn, cpu_device()(s.ps), cpu_device()(s.st),
+        s.def_co2, s.def_ocean_em, s.def_land_em,
     )
 end

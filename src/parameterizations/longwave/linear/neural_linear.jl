@@ -28,8 +28,8 @@ end
 function NeuralLinearLW(
     spectral_grid::SpectralGrid,
     arch_config;
-    zscore_file = nothing,      # file in data/stats containing zscore stats
-    scaling_file = nothing,     # file in data/stats containing scaling stats
+    zscore_folder = nothing,    # folder in data/stats containing zscore stats
+    scaling_folder = nothing,   # folder in data/stats containing scaling stats
     standard_scaling = false,   # use standard scaling 
     rng = Random.default_rng(),
 )
@@ -50,23 +50,23 @@ function NeuralLinearLW(
 
     # Load zscore statistics
     if isnothing(zscore_file)
-        zs_file = "zscore_abrlw_L$(nlayers).jld2"   #XXX
+        zs_folder = "zscore_llw_L$(nlayers)"
     else
-        zs_file = zscore_file
+        zs_folder = zscore_folder
     end
     
-    zscore = ZScoreStats(zs_file, arch)
+    zscore = ZScoreStats(zs_folder, arch)
 
 
     # Load scaling statistics
     if standard_scaling == false
-        if isnothing(scaling_file)
-            sc_file = "scaling_llw_L$(nlayers).jld2"
+        if isnothing(scaling_folder)
+            sc_folder = "scaling_llw_L$(nlayers)"
         else
-            sc_file = scaling_file
+            sc_folder = scaling_folder
         end
 
-        scaling = Scaling(sc_file, arch)
+        scaling = Scaling(sc_folder, arch)
     else
         scaling = Scaling(nlayers)
     end
@@ -109,12 +109,15 @@ Base.@propagate_inbounds function SpeedyWeather.parameterization!(
     nlayers = model.spectral_grid.nlayers
 
 
-    # Alias input buffer
+    # Extract variables
+    T = @view vars.grid.temperature_prev[ij,:] 
+
+
+    # Populate input buffer
     X  = scheme.input_buffer
 
-    # Extract input variables into input buffer
     for k in 1:nlayers
-        X[k] = vars.grid.temperature[ij,k]          
+        X[k] = T[k]          
     end
 
 
@@ -131,7 +134,7 @@ Base.@propagate_inbounds function SpeedyWeather.parameterization!(
         ak = Y[2*k-1] * scheme.scaling.sc_a[k]
         bk = Y[2*k] * scheme.scaling.sc_b[k]
 
-        dTk = ak * vars.grid.temperature[ij,k] + bk
+        dTk = ak * T[k] + bk
 
         vars.tendencies.grid.temperature[ij,k] += dTk
     end

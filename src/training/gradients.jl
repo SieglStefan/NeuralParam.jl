@@ -16,7 +16,7 @@ function compute_gradients(
     vars0, 
     sim_target, 
     sim_train, 
-    n_steps, 
+    n_steps,
     test_mode
 )
 
@@ -32,8 +32,10 @@ function compute_gradients(
     bvars_ad = make_zero(vars_ad)
 
     # Seed gradient container and calculate loss
-    L = seed_loss!(bvars_ad, para, sim_train.variables, sim_target.variables)
+    loss = seed_loss!(bvars_ad, para, sim_train.variables, sim_target.variables)
 
+    # Compute metric losses
+    metrics = compute_metrics(para, sim_train.variables, sim_target.variables)
 
     # Copy training model and seed model gradient container
     model_ad = deepcopy(sim_train.model)
@@ -43,7 +45,7 @@ function compute_gradients(
 
     # In test mode, skip Enzyme compilation and return zero gradients
     if test_mode
-        return L, bmodel_ad.longwave_radiation.ps
+        return bmodel_ad.longwave_radiation.ps, loss, metrics
     end
 
 
@@ -65,7 +67,7 @@ function compute_gradients(
     # Extract parameter gradients from bmodel_ad
     grads = bmodel_ad.longwave_radiation.ps
 
-    return L, grads
+    return grads, loss, metrics
 end
 
 
@@ -90,53 +92,4 @@ function checkpointed_timesteps!(
     end
 
     return nothing
-end
-
-
-
-
-function seed_loss!(bvars_ad, ::AbstractLinearLW, vars_train, vars_target)
-    
-
-    # Extract final temperature fields
-    T_train = vars_train.grid.temperature
-    T_target = vars_target.grid.temperature
-    N = length(T_target)
-
-
-    # Seed reverse AD with dMSE/dT_train_out, where T_out is the final temperature after n_steps.
-    #
-    # Before autodiff:
-    #   bvars_ad.grid.temperature = dL/dT_train_out = 2 .* (T_train_out .- T_target_out) ./ N
-    #          -> L = (T_train_out - T_target_out)^2 / N = MSE
-    #
-    # After autodiff:
-    #   bvars_ad contains dL/d(vars_ad input)
-    #
-    bvars_ad.grid.temperature.= 2f0 .* (T_train .- T_target)  ./ N
-
-    return rmse(T_train, T_target)
-end
-
-
-# XXX  Change later
-function seed_loss!(bvars_ad, ::AbstractABRLW, vars_train, vars_target)
-    # Extract final temperature fields
-    T_train = vars_train.grid.temperature
-    T_target = vars_target.grid.temperature
-    N = length(T_target)
-
-
-    # Seed reverse AD with dMSE/dT_train_out, where T_out is the final temperature after n_steps.
-    #
-    # Before autodiff:
-    #   bvars_ad.grid.temperature = dL/dT_train_out = 2 .* (T_train_out .- T_target_out) ./ N
-    #          -> L = (T_train_out - T_target_out)^2 / N = MSE
-    #
-    # After autodiff:
-    #   bvars_ad contains dL/d(vars_ad input)
-    #
-    bvars_ad.grid.temperature.= 2f0 .* (T_train .- T_target)  ./ N
-
-    return rmse(T_train, T_target)
 end

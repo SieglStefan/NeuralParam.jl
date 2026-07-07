@@ -4,10 +4,21 @@
 
 
 
+# Mean squared error
+function mse(x, y)
+    return sum(abs2, (y .- x)) / length(x)
+end
+
 # Root mean squared error
 function rmse(x, y)
-    return sqrt(sum((y .- x).^2) / length(x))
+    return sqrt(mse(x, y))
 end
+
+# Normalized mean squared error
+function norm_mse(x, y, std)
+    return sum(abs2, (x .- y) ./ std) / length(x)
+end
+
 
 # Bias
 function bias(x, y)

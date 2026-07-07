@@ -12,6 +12,7 @@ using Checkpointing
 using JLD2
 using CSV
 using DataFrames
+using TOML
 
 using Random
 using Dates
@@ -37,8 +38,8 @@ export
         # device.jl
                         #to_cpu,
         # io.jl
-                save,
-                load,
+                save_scheme,
+                load_scheme,
                         #load_stats,
                         #csv_init,
                         #csw_row!,
@@ -47,7 +48,10 @@ export
                         #arch_meta,
                         #meta_scheme,
                         #build_meta,
+                        #_toml,
+                write_info,
         # metrics.jl
+                mse,
                 rmse,
                 bias,
                 correlation,
@@ -58,10 +62,12 @@ export
                 plot_loss,
                 plot_training,
                 plot_training_comp,
+                plot_metrics,
                 plot_comparison,
                         #field_to_lonlatmat,
                 plot_heatmap,
                 plot_heatmaps,
+                plot_histograms,
         # printing.jl
                         #print_ic,
                         #print_traj,
@@ -100,10 +106,13 @@ export
         # config.jl
                 RunConfig,
                 OutputConfig,
+        # loss.jl
+                compute_metrics,
+                        #seed_loss!,
         # gradients.jl
                         #compute_gradients,
                         #checkpointed_timesteps!,
-                        #seed_loss!,
+                        
         # run_training.jl
                 run_training
         # training_offline
@@ -147,6 +156,7 @@ include("utils/device.jl")
 
 
 # Training infrastructure
+include("training/loss.jl")
 include("training/gradients.jl")
 include("training/config.jl")
 include("training/training_online.jl")

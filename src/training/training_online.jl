@@ -34,69 +34,55 @@ function training_online(;
     lw_radiation_target,
     run_config,
     output_config,
-    save_path,
-    test_mode
+    output_path,
+    test_mode,
 )
 
-    # Unpack config parameters
-    (; eta0, eta_decay, patience, min_delta,
-    t_spinup, 
-    n_ic, n_traj, n_epochs, n_steps, n_gap,
-    fac_pert_T, fac_pert_q) = run_config
-
-    (; printing_ic, printing_traj, printing_epochs,
-    train_save, train_file,
-    plotting) = output_config
+    # Unpack run config parameters
+    (; eta_decay, patience, min_delta,
+    n_ic, n_traj, n_epochs, n_steps_0, n_steps_inc, n_gap,
+    ) = run_config
 
 
-    ## Setup optimiser
-    eta = eta0
+    # Set seed for reproducability
+    Random.seed!(run_config.seed)
 
-    rule = Optimisers.Adam(eta)
-    opt_state = Optimisers.setup(rule, lw_radiation_train.ps)
 
+    # Setup optimiser
+    opt_state, eta = setup_optimiser(run_config, ps=lw_radiation_train.ps)
+   
     # Define variables for training control
-    best_loss = 1000f0
-    loss_ic_mean = 0f0
+    best_loss = Inf32
     stale = 0
-    best_ps = deepcopy(lw_radiation_train.ps)
+    best_ps = deepcopy(ps)
 
 
-    # Create target and training simulation and do a first timestep (initalize implicit solver)
-    model_target = isnothing(lw_radiation_target) ?
-        PrimitiveWetModel(; spectral_grid) :
-        PrimitiveWetModel(; spectral_grid, longwave_radiation = lw_radiation_target)
-    sim_target   = initialize!(model_target)
-    SpeedyWeather.initialize!(sim_target, steps=0)
-    SpeedyWeather.first_timesteps!(sim_target)
-
-    model_train  = PrimitiveWetModel(; spectral_grid, longwave_radiation = lw_radiation_train)
-    sim_train    = initialize!(model_train)
-    SpeedyWeather.initialize!(sim_train, steps=0)
-    SpeedyWeather.first_timesteps!(sim_train)
-
-    # Create template model and simulationfor later copying
-    model_template = PrimitiveWetModel(; spectral_grid)
-    sim_template = initialize!(model_template)
+    # Setup simulations
+    sim_template, sim_train, sim_target = setup_simulations(
+        spectral_grid,
+        lw_radiation_train,
+        lw_radiation_target,
+    )
 
 
-    # Prepare containers for logging
+    # Define containers for logging
     L = Float32[]       # loss
     PN = Float32[]      # parameter norm
     GN = Float32[]      # gradient norm
 
+
     # Initalize .csv file for logging
-    if train_save
-        meta = build_meta(lw_radiation_train, run_config)
-        csv_init(meta; path=save_path, file=train_file)
+    if output_config.train_save
+        meta = build_meta(lw_radiation_train, lw_radiation_target, run_config)
+        metric_keys = keys(compute_metrics(lw_radiation_train, sim_train.variables, sim_target.variables))
+        csv_init(meta, metric_keys; path=output_path, file=output_config.train_file)
     end
 
 
     # Print training start information
     @info "Online training started!"
-    print_config(run_config, 2*model_template.time_stepping.Δt_sec)
+    print_config(run_config, 2*sim_template.model.time_stepping.Δt_sec)
 
-    # Warn when running without autodiff
     if test_mode
         @warn "Test mode is activated! Enzyme.autodiff is NOT used!"
     end
@@ -106,24 +92,14 @@ function training_online(;
     # Loop over initial conditions
     for ic in 1:n_ic
     
-        ### Prepare reference simulation
+        # Update number of steps for calculating gradients
+        n_steps = n_steps_0 + (ic-1) * n_steps_inc
 
-        # Copy template simulation for pertubation
-        sim_pert = deepcopy(sim_template)
-
-        # Perturb temperature and humidity fields
-        perturb_grid_field!(sim_pert, :temperature; fac_add = fac_pert_T)
-        perturb_grid_field!(sim_pert, :humidity; fac_mult = fac_pert_q, zeromin = true)
-        
-        # Spinup simulation 
-        run!(sim_pert, period = Hour(t_spinup))
-
-        # Create reference simulation
-        sim_ref = deepcopy(sim_pert)
-
-        # Initialize reference trajectory and do a first step
-        SpeedyWeather.initialize!(sim_ref, steps = n_traj * (n_gap + n_steps) + 1)
-        SpeedyWeather.first_timesteps!(sim_ref)
+        # Draw a starting date
+        start_date = sample_start_date(ic, n_ic)
+    
+        # Prepare reference simulation 
+        sim_ref = prepare_reference(sim_template, run_config, n_steps, start_date)
 
 
 
@@ -166,7 +142,7 @@ function training_online(;
 
 
                 # Perform one training step
-                lw_radiation_train, loss, grads, ps_new, opt_state = online_training_step(
+                step = online_training_step(
                     lw_radiation_train;
                     vars0,
                     sim_target,
@@ -174,25 +150,29 @@ function training_online(;
                     n_steps,
                     opt_state,
                     test_mode
-                )                        
+                )            
+                
+                lw_radiation_train = step.lw_radiation
+                opt_state = step.opt_state
 
 
                 # Store loss, parameters, gradients, and norms
-                push!(L, loss)
-                push!(PN, Float32(tree_l2norm(ps_new)))
-                push!(GN, Float32(tree_l2norm(grads)))
+                push!(L, step.loss)
+                push!(PN, Float32(tree_l2norm(step.lw_radiation.ps)))
+                push!(GN, Float32(tree_l2norm(step.grads)))
 
                 # Write to .csv
-                if train_save
+                if output_config.train_save
                     csv_row!(
-                        ic, traj, epoch, L[end], eta, PN[end], GN[end];
-                        path=save_path, file=train_file
+                        ic, traj, epoch, n_steps, 
+                        L[end], eta, PN[end], GN[end], step.metrics;
+                        path=output_path, file=output_config.train_file
                     )
                 end
                     
 
                 # Print epoch update
-                if printing_epochs
+                if output_config.printing_epochs
                     print_epochs(epoch, L[end], PN[end], GN[end])
                 end
             end
@@ -205,7 +185,7 @@ function training_online(;
             
             
             # Print trajectory update
-            if printing_traj
+            if output_config.printing_traj
                 print_traj(traj, L[end], PN[end], GN[end])
             end
         end
@@ -231,12 +211,12 @@ function training_online(;
 
 
         # Print IC update
-        if printing_ic
+        if output_config.printing_ic
             print_ic(ic, L[end], PN[end], GN[end])
         end
 
         # Plot current loss trajectory after every ic
-        if plotting
+        if output_config.live_plots
             display(plot_training(L, PN, GN))
         end
     end 
@@ -260,7 +240,7 @@ function online_training_step(
 )
 
     # Compute gradients 
-    loss, grads = compute_gradients(
+    grads, loss, metrics = compute_gradients(
         vars0, 
         sim_target, 
         sim_train, 
@@ -272,7 +252,7 @@ function online_training_step(
     opt_state, ps_new = Optimisers.update(opt_state, lw_radiation_train.ps, grads)
     lw_radiation_new = update_ps(lw_radiation_train, ps_new)
 
-    return lw_radiation_new, loss, grads, ps_new, opt_state
+    return (; lw_radiation=lw_radiation_new, loss, metrics, grads, opt_state)
 end
 
 
@@ -289,12 +269,12 @@ end
 
 # Helper function for updating parameterization parameters
 function update_ps(lw::NeuralABRLW, ps_new)
-    return NeuralABRLW(lw.n_in, lw.n_out, lw.arch_config, lw.zscore, lw.nn, ps_new, lw.st, lw.input_buffer)
+    return NeuralABRLW(lw.n_in, lw.n_out, lw.arch_config, lw.zscore, lw.nn, ps_new, lw.st, lw.input_buffer, lw.def_co2, lw.def_ocean_em, lw.def_land_em)
 end
 
 # Helper function for updating parameterization parameters
 function update_ps(lw::NeuralABRLWGlobal, ps_new)
-    return NeuralABRLWGlobal(lw.n_in, lw.n_out, lw.n_points, lw.arch_config, lw.zscore, lw.nn, ps_new, lw.st)
+    return NeuralABRLWGlobal(lw.n_in, lw.n_out, lw.n_points, lw.arch_config, lw.zscore, lw.nn, ps_new, lw.st, lw.def_co2, lw.def_ocean_em, lw.def_land_em)
 end
 
 
@@ -311,4 +291,80 @@ function sim_timesteps!(sim, n_steps)
     end
 
     return nothing
+end
+
+
+
+function setup_simulations(
+    spectral_grid,
+    lw_radiation_train,
+    lw_radiation_target,
+)
+
+    # Create template model and simulationfor later copying
+    model_template = PrimitiveWetModel(; spectral_grid)
+    sim_template = initialize!(model_template)
+
+    # Create target and training simulation and do a first timestep (initalize implicit solver)
+    model_target = isnothing(lw_radiation_target) ?
+        PrimitiveWetModel(; spectral_grid) :
+        PrimitiveWetModel(; spectral_grid, longwave_radiation = lw_radiation_target)
+    sim_target   = initialize!(model_target)
+    SpeedyWeather.initialize!(sim_target, steps=0)
+    SpeedyWeather.first_timesteps!(sim_target)
+
+    model_train  = PrimitiveWetModel(; spectral_grid, longwave_radiation = lw_radiation_train)
+    sim_train    = initialize!(model_train)
+    SpeedyWeather.initialize!(sim_train, steps=0)
+    SpeedyWeather.first_timesteps!(sim_train)
+
+    return sim_template, sim_train, sim_target
+end
+
+
+
+function setup_optimiser(
+    run_config;
+    ps
+)
+    eta = run_config.eta0
+
+    rule = Optimisers.Adam(eta)
+    opt_state = Optimisers.setup(rule, ps)
+
+    return opt_state, eta
+end
+
+
+
+function prepare_reference(sim_template, run_config, n_steps, start_date)
+
+    # Copy template simulation for pertubation and set start date
+    sim_pert = deepcopy(sim_template)
+    SpeedyWeather.set!(sim_pert.variables.prognostic.clock; time=start_date, start=start_date)
+
+    # Perturb temperature and humidity fields
+    perturb_grid_field!(sim_pert, :temperature; fac_add = run_config.fac_pert_T)
+    perturb_grid_field!(sim_pert, :humidity; fac_mult = run_config.fac_pert_q, zeromin = true)
+        
+    # Spinup simulation 
+    run!(sim_pert, period = Hour(run_config.t_spinup))
+
+    # Create reference simulation
+    sim_ref = deepcopy(sim_pert)
+
+    # Initialize reference trajectory and do a first step
+    SpeedyWeather.initialize!(sim_ref, steps = run_config.n_traj * (run_config.n_gap + n_steps) + 1)
+    SpeedyWeather.first_timesteps!(sim_ref)
+
+    return sim_ref
+end
+
+
+
+# XXX
+function sample_start_date(ic, n_ic; year=2000)
+    bin = 365 / n_ic
+    doy = (ic-1)*bin + rand()*bin
+    return DateTime(year, 1, 1) + Day(floor(Int, doy))
 end

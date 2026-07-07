@@ -62,7 +62,7 @@ Base.@propagate_inbounds function SpeedyWeather.parameterization!(
         ak = scheme.ps.a[k] * scheme.scaling.sc_a[k]
         bk = scheme.ps.b[k] * scheme.scaling.sc_b[k]
 
-        dTk = ak * vars.grid.temperature[ij,k] + bk
+        dTk = ak * vars.grid.temperature_prev[ij,k] + bk
 
         vars.tendencies.grid.temperature[ij,k] += dTk
     end
