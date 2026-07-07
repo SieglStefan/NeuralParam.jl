@@ -1,0 +1,16 @@
+amp_t = 2.0
+created = 2026-07-07T12:21:48.799Z
+gap_real = 3.6388890743255615
+inputs = ["temperature"]
+julia = "1.10.11"
+lw_scheme = "OneBandLongwave"
+n_ic = 5
+n_stats = 100
+name = ""
+nlayers = 8
+outputs = ["none: scaled via ConstLinearLW parameters"]
+sample_gap = 3.65
+seed = 1234
+sim_time = 365
+t_spinup = 30
+trunc = 31
