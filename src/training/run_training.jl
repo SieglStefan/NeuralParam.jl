@@ -15,11 +15,13 @@ function run_training(
 )
 
     # Decide saving path
-    if isnothing(output_config.save_path)
-        save_path = "$(nameof(typeof(lw_radiation_train)))_L$(spectral_grid.nlayers)_$(Dates.format(now(), "yyyymmdd_HHMMSS"))"
+    if isnothing(output_config.output_path)
+        output_folder = "$(nameof(typeof(lw_radiation_train)))_L$(spectral_grid.nlayers)_$(Dates.format(now(), "yyyymmdd_HHMMSS"))"
+        output_path = joinpath(pwd(), output_folder)
     else
-        save_path = output_config.save_path
+        output_path = output_config.output_path
     end
+
 
 
     # Run offline optimization loop
@@ -33,14 +35,14 @@ function run_training(
         lw_radiation_target,
         run_config,
         output_config,
-        save_path,
+        output_path,
         test_mode,
     )
 
 
-    # If true, save parameterization
-    if output_config.param_save
-        save(param; path=save_path, file=output_config.param_file)
+    # If true, save parameterization scheme
+    if output_config.scheme_save
+        save_scheme(param; path=output_path, file=output_config.scheme_file)
     end
 
     return param, L, PN, GN

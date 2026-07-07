@@ -13,9 +13,9 @@ end
 
 
 # Convenience constructor loading pre-calculated stats and pushing them on arch
-function Scaling(file::String, arch = SpeedyWeather.CPU())
+function Scaling(folder::String, arch = SpeedyWeather.CPU())
 
-    data = load_stats(file)
+    data = load_stats(folder)
 
     return Scaling(
         on_architecture(arch, Float32.(data["sc_a"])),
@@ -29,10 +29,10 @@ Scaling(nlayers::Int) = Scaling(fill(5f-8, nlayers), fill(5f-6, nlayers))
 
 
 # Calculate the z-score transformation of x
-@inline zscore(x, μ, σ) = (x - μ) / σ
+@inline zscore(x, μ, σ) = (x .- μ) ./ σ
 
 # Calculate the inverse z-score transformation of z
-@inline inv_zscore(z, μ, σ) = z * σ + μ
+@inline inv_zscore(z, μ, σ) = z .* σ .+ μ
 
 
 # Struct holding zscore parameters
@@ -46,9 +46,9 @@ end
 
 
 # Convenience constructor loading pre-calculated stats and push them on arch
-function ZScoreStats(file::String, arch = SpeedyWeather.CPU())
+function ZScoreStats(folder::String, arch = SpeedyWeather.CPU())
     
-    data = load_stats(file)
+    data = load_stats(folder)
 
     return ZScoreStats(
         on_architecture(arch,   Float32.(data["input_mean"])),

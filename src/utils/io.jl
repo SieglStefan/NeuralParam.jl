@@ -4,49 +4,43 @@
 
 
 
-# Save object, possible objects:
-# - AbstractNeuralLW
-# - Scaling
-# - ZScoreStats
-function save(object; path="", file="")
+# Saves a parameterization scheme as .jld2
+function save_scheme(scheme; path="", file="")
 
     mkpath(path)
     filepath = joinpath(path, file)
 
-    # Save object
-    JLD2.jldsave(filepath; object = to_cpu(object))
+    # Save scheme
+    JLD2.jldsave(filepath; scheme = to_cpu(scheme))
 
-    @info "Object stored at $(filepath)!"
+    @info "Scheme stored at $(filepath)!"
 
     return filepath
 end
 
 
-# Load object, possible objects:
-# - AbstractNeuralLW
-# - Scaling
-# - ZScoreStats
-function load(; path="", file="")
+# Loads a .jld2 parameterization scheme
+function load_scheme(; path="", file="")
 
     filepath = joinpath(path, file)
 
-    # Load object
-    object = JLD2.load(filepath, "object")
+    # Load scheme
+    scheme = JLD2.load(filepath, "scheme")
 
-    @info "Object loaded from $(filepath)!"
+    @info "Scheme loaded from $(filepath)!"
 
-    return object
+    return scheme
 end
 
 
 
 # Load a statistics file (zscore or scaling)
-load_stats(file) = JLD2.load(joinpath(@__DIR__, "..", "..", "data", "stats", file))
+load_stats(folder; file="stats.jld2") = JLD2.load(joinpath(@__DIR__, "..", "..", "data", "stats", folder, file))
 
 
 
 # Intialize .csv file for logging training data and create a meta data overview
-function csv_init(meta; path="", file="")
+function csv_init(meta, metric_keys; path="", file="")
 
     mkpath(path)
     filepath = joinpath(path, file)
@@ -57,7 +51,7 @@ function csv_init(meta; path="", file="")
             println(io, "# ", k, " = ", v)
         end
         # Write table header
-        println(io, "ic,traj,epoch,loss,eta,pnorm,gnorm")
+        println(io, "ic,traj,epoch,n_steps,loss,eta,pnorm,gnorm," * join(metric_keys, ","))
     end
 
     @info ".csv file created and initialized at $(filepath)!"
@@ -67,12 +61,12 @@ end
 
 
 # Write a row of training data to .csv
-function csv_row!(ic, traj, epoch, loss, eta, pnorm, gnorm; path="", file="")
+function csv_row!(ic, traj, epoch, n_steps, loss, eta, pnorm, gnorm, metrics; path="", file="")
 
     filepath = joinpath(path, file)
 
     open(filepath, "a") do io
-        println(io, join((ic, traj, epoch, loss, eta, pnorm, gnorm), ","))
+        println(io, join((ic, traj, epoch, n_steps, loss, eta, pnorm, gnorm, values(metrics)...), ","))
     end
 
     return nothing
@@ -146,17 +140,35 @@ meta_scheme(s::NeuralABRLWGlobal) = merge(Dict(
 
 
 # Merge the meta data together
-function build_meta(scheme, run_config)
+function build_meta(scheme, target, run_config)
+    target_name = isnothing(target) ? "default" : string(nameof(typeof(target)))
     return merge(
         meta_scheme(scheme),
+        Dict(string(f) => getfield(run_config, f) for f in fieldnames(typeof(run_config))),  # all config fields
         Dict(
-            "created"  => string(now()),
-            "t_spinup" => run_config.t_spinup,
-            "n_ic"     => run_config.n_ic,
-            "n_traj"   => run_config.n_traj,
-            "n_epochs" => run_config.n_epochs,
-            "n_steps"  => run_config.n_steps,
-            "n_gap"    => run_config.n_gap,
-        )
+            "created"       => string(now()),
+            "julia"         => string(VERSION),
+            "target_scheme" => target_name,
+        ),
     )
+end
+
+
+
+# Make values TOML-serializable
+_toml(x)                = x
+_toml(x::AbstractFloat) = Float64(x)
+_toml(x::Symbol)        = string(x)
+_toml(x::AbstractDict)  = Dict(string(k) => _toml(v) for (k, v) in x)
+
+# Write stats meta data into .toml file
+function write_info(; path="", file="", kwargs...)
+    meta = Dict(string(k) => _toml(v) for (k, v) in kwargs)
+    mkpath(path)
+    filepath = joinpath(path, file)
+    open(filepath, "w") do io
+        TOML.print(io, meta; sorted = true)   # sorted = stable, diff-friendly
+    end
+    @info "Info file written to $(filepath)!"
+    return filepath
 end

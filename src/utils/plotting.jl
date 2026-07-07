@@ -13,6 +13,8 @@
 ###         plots a single heatmap
 ### - plot_heatmaps:
 ###         plots 3 heatmaps with a shared colorbar
+### - plot_histograms
+###         plots histograms of fields for zscore validation
 
 
 
@@ -128,6 +130,39 @@ end
 
 
 
+# Plot per-component metrics from a training .csv:
+function plot_metrics(; path="", file="", fraction=1.0, kwargs...)
+    df = csv_read(; path, file)
+
+    # keep only the last `fraction` of rows (at least 1), preserving original step numbers
+    n  = nrow(df)
+    k  = max(1, round(Int, n * clamp(fraction, 0, 1)))
+    i0 = n - k + 1
+    df   = df[i0:n, :]
+    step = i0:n                      # original step numbers on the x-axis, not 1-based
+
+    comps = [c[6:end] for c in names(df) if startswith(c, "rmse_")]
+    isempty(comps) && error("No rmse_* metric columns found in $(joinpath(path, file)).")
+
+    panels = []
+    for comp in comps
+        push!(panels, Plots.plot(step, df[!, "rmse_"*comp];
+            ylabel = "RMSE ($comp)", yscale = :log10, lw = 2, legend = false))
+        pb = Plots.plot(step, df[!, "bias_"*comp];
+            ylabel = "bias ($comp)", lw = 2, legend = false)
+        Plots.hline!(pb, [0]; color = :black, ls = :dash, lw = 1, label = "")
+        push!(panels, pb)
+    end
+
+    Plots.xlabel!(panels[end-1], "Training step")
+    Plots.xlabel!(panels[end],   "Training step")
+
+    return Plots.plot(panels...; layout = (length(comps), 2),
+                      plot_title = "Per-component metrics", kwargs...)
+end
+
+
+
 # Plot timeseries of two fields in respect to a given metric
 function plot_comparison(
     target::NamedTuple,
@@ -193,7 +228,7 @@ end
 
 
 # Plot a multiple heatmaps with a shared colorbar
-function plot_heatmaps(F_vec; titles = nothing, layout = :vertical, coastlines = true, grid = false, kwargs...)
+function plot_heatmaps(F_vec; titles = nothing, layout = :vertical, coastlines = true, grid = false, suptitle = "", kwargs...)
     n      = length(F_vec)
     titles = isnothing(titles) ? ["Heatmap $i" for i in 1:n] : titles
     conv   = [field_to_lonlatmat(F) for F in F_vec]
@@ -217,6 +252,30 @@ function plot_heatmaps(F_vec; titles = nothing, layout = :vertical, coastlines =
     end
 
     layout == :vertical ? CairoMakie.Colorbar(fig[:, 2], hm) : CairoMakie.Colorbar(fig[1, n+1], hm)
+
+    isempty(suptitle) || CairoMakie.Label(fig[0, :], suptitle; fontsize = 18, font = :bold)
     CairoMakie.resize_to_layout!(fig)
+    return fig
+end
+
+
+
+# XXX
+function plot_histograms(data, titles; ncols=4, nbins=50, logx=false, suptitle="", size=(1500, 650))
+    fig = CairoMakie.Figure(; size)
+    for (k, (d, title)) in enumerate(zip(data, titles))
+        d = filter(isfinite, d)
+        logx && (d = log10.(filter(>(0), d)))
+        ax = CairoMakie.Axis(fig[cld(k, ncols), mod1(k, ncols)];
+                             title, titlesize = 12,
+                             xlabel = logx ? "log₁₀" : "",
+                             xticks = CairoMakie.LinearTicks(4),
+                             xticklabelrotation = π/5, xticklabelsize = 10)
+        CairoMakie.hist!(ax, d; bins = nbins)
+        CairoMakie.text!(ax, 0.03, 0.97;
+                         text = "μ=$(round(mean(d), sigdigits=4))\nσ=$(round(std(d), sigdigits=4))",
+                         space = :relative, align = (:left, :top), fontsize = 9)
+    end
+    isempty(suptitle) || CairoMakie.Label(fig[0, :], suptitle; fontsize = 17, font = :bold)
     return fig
 end
