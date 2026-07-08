@@ -233,11 +233,11 @@ end
 
 
 # Plot a multiple heatmaps with a shared colorbar
-function plot_heatmaps(F_vec; titles = nothing, layout = :vertical, coastlines = true, grid = false, suptitle = "", kwargs...)
+function plot_heatmaps(F_vec; titles = nothing, layout = :vertical, coastlines = true, grid = false, suptitle = "", colorrange=nothing, kwargs...)
     n      = length(F_vec)
     titles = isnothing(titles) ? ["Heatmap $i" for i in 1:n] : titles
     conv   = [field_to_lonlatmat(F) for F in F_vec]
-    crange = finite_range([c[3] for c in conv])
+    crange = isnothing(colorrange) ? finite_range([c[3] for c in conv]) : colorrange
 
     fig = CairoMakie.Figure()
     hm  = nothing
@@ -265,17 +265,19 @@ end
 
 
 
+function plot_heatmaps_eval(trajectories, Δt_sample, day; layer, titles=nothing, colorrange=nothing)
+    n      = length(first(trajectories).temperature)          # Länge von IRGENDeiner Trajektorie
+    t_days = (0:n-1) .* Δt_sample ./ 86400
+    i      = argmin(abs.(t_days .- day))
 
+    fields = [traj.temperature[i] for traj in trajectories]   # ein Snapshot pro Schema (in Key-Reihenfolge)
+    titles = isnothing(titles) ? collect(string.(keys(trajectories))) : titles
 
-
-function plot_heatmaps_eval(trajectories, Δt_sample, day; layer, titles)
-    t_days = (0:length(trajectories.comp.temperature)-1) .* Δt_sample ./ 86400
-    i = argmin(abs.(t_days .- day))
-    fields = [trajectories.target.temperature[i], trajectories.comp.temperature[i],
-              trajectories.none.temperature[i],   trajectories.uncal.temperature[i]]
     return plot_heatmaps(extract_layer(layer, fields);
-                         titles, suptitle = "After $(round(t_days[i], digits=1)) days")
+                         titles, suptitle = "After $(round(t_days[i], digits=1)) days",
+                         colorrange)
 end
+
 
 
 

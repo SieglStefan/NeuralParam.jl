@@ -83,6 +83,7 @@ export
                 ZScoreStats,
         # utils.jl
                 extract_layer,
+                target_colorrange,
 
 
         ### architectures
