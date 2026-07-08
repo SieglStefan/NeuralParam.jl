@@ -49,7 +49,7 @@ function NeuralLinearLW(
 
 
     # Load zscore statistics
-    if isnothing(zscore_file)
+    if isnothing(zscore_folder)
         zs_folder = "zscore_llw_L$(nlayers)"
     else
         zs_folder = zscore_folder

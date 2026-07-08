@@ -36,12 +36,12 @@ Scaling(nlayers::Int) = Scaling(fill(5f-8, nlayers), fill(5f-6, nlayers))
 
 
 # Struct holding zscore parameters
-struct ZScoreStats{V}
-    input_mean::V
-    input_std::V
+struct ZScoreStats{VI,VO}
+    input_mean::VI
+    input_std::VI
 
-    output_mean::V
-    output_std::V
+    output_mean::VO
+    output_std::VO
 end
 
 
