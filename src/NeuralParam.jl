@@ -35,6 +35,8 @@ export
         ### utils
         # data.jl
                 perturb_grid_field!,
+                sample_sims,
+                sample_trajectory,
         # device.jl
                         #to_cpu,
         # io.jl
