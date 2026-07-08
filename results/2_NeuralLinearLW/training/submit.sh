@@ -11,7 +11,7 @@
 
 set -euo pipefail
 module purge
-module load julia/1.10.11
+module load julia/1.10.10
 
 export OPENBLAS_NUM_THREADS=${SLURM_CPUS_PER_TASK:-4}
 export JULIA_NUM_THREADS=1
