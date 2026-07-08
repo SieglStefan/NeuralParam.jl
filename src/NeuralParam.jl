@@ -69,6 +69,7 @@ export
                         #field_to_lonlatmat,
                 plot_heatmap,
                 plot_heatmaps,
+                plot_heatmaps_eval,
                 plot_histograms,
         # printing.jl
                         #print_ic,

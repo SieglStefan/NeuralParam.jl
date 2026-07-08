@@ -75,10 +75,10 @@ function sample_trajectory(sim, ic; n_steps, n_gap)
     SpeedyWeather.first_timesteps!(sim)
     copy!(sim.variables, ic)                              # geteilte IC NACH dem Setup → bleibt erhalten (behebt die init-Reihenfolge)
 
-    data = [copy(vec(sim.variables.grid.temperature))]
+    data = [copy(sim.variables.grid.temperature)]
     for step in 1:n_steps
         SpeedyWeather.later_timestep!(sim)
-        step % n_gap == 0 && push!(data, copy(vec(sim.variables.grid.temperature)))
+        step % n_gap == 0 && push!(data, copy(sim.variables.grid.temperature))
     end
     return (; temperature = data)
 end

@@ -265,6 +265,20 @@ end
 
 
 
+
+
+
+function plot_heatmaps_eval(trajectories, Δt_sample, day; layer, titles)
+    t_days = (0:length(trajectories.comp.temperature)-1) .* Δt_sample ./ 86400
+    i = argmin(abs.(t_days .- day))
+    fields = [trajectories.target.temperature[i], trajectories.comp.temperature[i],
+              trajectories.none.temperature[i],   trajectories.uncal.temperature[i]]
+    return plot_heatmaps(extract_layer(layer, fields);
+                         titles, suptitle = "After $(round(t_days[i], digits=1)) days")
+end
+
+
+
 # XXX
 function plot_histograms(data, titles; ncols=4, nbins=50, logx=false, suptitle="", size=(1500, 650))
     fig = CairoMakie.Figure(; size)
