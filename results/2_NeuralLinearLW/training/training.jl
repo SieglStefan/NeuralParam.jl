@@ -1,6 +1,5 @@
 ### XXX
 
-using Revise
 using NeuralParam
 using SpeedyWeather
 using Dates
@@ -14,7 +13,7 @@ arch = MLPConfig()
 
 lw_radiation_target = OneBandLongwave(SG)
 
-scheme = NeuralABRLW(SG, arch)
+scheme = NeuralLinearLW(SG, arch)
 
 timestamp = Dates.format(now(), "yyyy-mm-dd_HH-MM-SS")
 output_path = joinpath(@__DIR__, "run_T$(TRUNC)_L$(NLAYERS)_$(timestamp)")
@@ -30,4 +29,4 @@ param, L, PN, GN = run_training(
     lw_radiation_target,
     run_config, 
     output_config, 
-    test_mode=true)
+    test_mode=false)
