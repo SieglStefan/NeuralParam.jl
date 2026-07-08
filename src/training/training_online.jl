@@ -342,7 +342,12 @@ function setup_optimiser(
 )
     eta = run_config.eta0
 
-    rule = Optimisers.Adam(eta)
+    rule = Optimisers.OptimiserChain(
+        Optimisers.ClipNorm(1f0),
+        Optimisers.WeightDecay(1f-4),
+        Optimisers.Adam(eta),
+    )
+
     opt_state = Optimisers.setup(rule, ps)
 
     return opt_state, eta
