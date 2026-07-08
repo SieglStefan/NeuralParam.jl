@@ -9,7 +9,7 @@
     n_hidden::Int = 2           # number of hidden layers
     width::Int = 32             # width of neural network
     
-    act::A = Lux.leakyrelu          # activation function
+    act::A = Lux.leakyrelu      # activation function
 end
 
 

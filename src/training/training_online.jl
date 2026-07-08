@@ -54,7 +54,7 @@ function training_online(;
     # Define variables for training control
     best_loss = Inf32
     stale = 0
-    best_ps = deepcopy(ps)
+    best_ps = deepcopy(lw_radiation_train.ps)
 
 
     # Setup simulations
@@ -76,6 +76,12 @@ function training_online(;
         meta = build_meta(lw_radiation_train, lw_radiation_target, run_config)
         metric_keys = keys(compute_metrics(lw_radiation_train, sim_train.variables, sim_target.variables))
         csv_init(meta, metric_keys; path=output_path, file=output_config.train_file)
+    end
+
+    # Initialize folder for training plots
+    if output_config.plots_save
+        dir = joinpath(output_path, output_config.plots_folder)
+        mkpath(dir)
     end
 
 
@@ -215,9 +221,16 @@ function training_online(;
             print_ic(ic, L[end], PN[end], GN[end])
         end
 
+
         # Plot current loss trajectory after every ic
-        if output_config.live_plots
-            display(plot_training(L, PN, GN))
+        if output_config.plots_save
+            p = plot_training(L, PN, GN;
+                plot_kwargs=(;plot_title = "until IC nr. $(ic)"))
+
+            dir = joinpath(output_path, output_config.plots_folder)
+            file = joinpath(dir, "IC_$(ic).png")
+            
+            Plots.savefig(p, file)
         end
     end 
     
