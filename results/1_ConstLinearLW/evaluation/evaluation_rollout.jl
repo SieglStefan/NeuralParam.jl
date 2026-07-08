@@ -45,7 +45,7 @@ data_comp = sample_sims(
     fac_pert_T = 2f0,
     fac_pert_q = 0f0,
     t_spinup = Day(31),
-    sim_time = 90,
+    sim_time = 91,
     sample_gap = SAMPLE_RES,
 )
 
@@ -54,8 +54,8 @@ data_comp = sample_sims(
 p_comp_rmse = plot_comparison(
     data_comp.trajectories.target,
     (; comp = data_comp.trajectories.comp,
-       none = data_comp.trajectories.none,
-       uncal = data_comp.trajectories.uncal);
+        uncal = data_comp.trajectories.uncal,
+       none = data_comp.trajectories.none);
     metric = rmse, Δt_sample = data_comp.Δt_sample,
     ylabel = "Temperature (K)"
 )
@@ -63,19 +63,21 @@ p_comp_rmse = plot_comparison(
 p_comp_bias = plot_comparison(
     data_comp.trajectories.target,
     (; comp = data_comp.trajectories.comp,
-       none = data_comp.trajectories.none,
-       uncal = data_comp.trajectories.uncal);
+        uncal = data_comp.trajectories.uncal,
+       none = data_comp.trajectories.none);
     metric = bias, Δt_sample = data_comp.Δt_sample,
     ylabel = "Temperature (K)"
 )
 
 
 
-titles = ["target / OneBandLongwave", "comp / ConstLinearLW","none / No LW Parameterization","uncal / Uncalibrated ConstLinearLW"] 
-heatmap_comp_0 = plot_heatmaps_eval(data_comp.trajectories, data_comp.Δt_sample, 0;  layer=8, titles=TITLES)
-heatmap_comp_7 = plot_heatmaps_eval(data_comp.trajectories, data_comp.Δt_sample, 7;  layer=8, titles=TITLES)
-heatmap_comp_30 = plot_heatmaps_eval(data_comp.trajectories, data_comp.Δt_sample, 30;  layer=8, titles=TITLES)
-heatmap_comp_90 = plot_heatmaps_eval(data_comp.trajectories, data_comp.Δt_sample, 90;  layer=8, titles=TITLES)
+titles = ["target / OneBandLongwave", "comp / ConstLinearLW", "uncal / Uncalibrated ConstLinearLW", "none / No LW Parameterization",]
+days = [0, 7, 30, 90]
+crange = target_colorrange(data_comp.trajectories.target; layer = 8)
+heatmap_comp_0 = plot_heatmaps_eval(data_comp.trajectories, data_comp.Δt_sample, 0;  layer=8, titles=titles, colorrange=crange)
+heatmap_comp_7 = plot_heatmaps_eval(data_comp.trajectories, data_comp.Δt_sample, 7;  layer=8, titles=titles, colorrange=crange)
+heatmap_comp_30 = plot_heatmaps_eval(data_comp.trajectories, data_comp.Δt_sample, 30;  layer=8, titles=titles, colorrange=crange)
+heatmap_comp_90 = plot_heatmaps_eval(data_comp.trajectories, data_comp.Δt_sample, 90;  layer=8, titles=titles, colorrange=crange)
 
 
 run_dir = joinpath(@__DIR__, run)
@@ -122,10 +124,11 @@ p_emulator_bias = plot_comparison(
 )
 
 titles = ["target / OneBandLongwave", "comp / ConstLinearLW"] 
-heatmap_emulator_0 = plot_heatmaps_eval(data_emulator.trajectories, data_emulator.Δt_sample, 0;  layer=8, titles=TITLES)
-heatmap_emulator_7 = plot_heatmaps_eval(data_emulator.trajectories, data_emulator.Δt_sample, 7;  layer=8, titles=TITLES)
-heatmap_emulator_30 = plot_heatmaps_eval(data_emulator.trajectories, data_emulator.Δt_sample, 30;  layer=8, titles=TITLES)
-heatmap_emulator_90 = plot_heatmaps_eval(data_emulator.trajectories, data_emulator.Δt_sample, 90;  layer=8, titles=TITLES)
+crange = target_colorrange(data_emulator.trajectories.target; layer = 8)
+heatmap_emulator_0 = plot_heatmaps_eval(data_emulator.trajectories, data_emulator.Δt_sample, 0;  layer=8, titles=titles, colorrange=crange)
+heatmap_emulator_7 = plot_heatmaps_eval(data_emulator.trajectories, data_emulator.Δt_sample, 7;  layer=8, titles=titles, colorrange=crange)
+heatmap_emulator_30 = plot_heatmaps_eval(data_emulator.trajectories, data_emulator.Δt_sample, 30;  layer=8, titles=titles, colorrange=crange)
+heatmap_emulator_90 = plot_heatmaps_eval(data_emulator.trajectories, data_emulator.Δt_sample, 90;  layer=8, titles=titles, colorrange=crange)
 
 
 

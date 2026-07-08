@@ -71,10 +71,11 @@ p_comp_bias = plot_comparison(
 
 
 titles = ["target / OneBandLongwave", "neural / NeuralLinearLW", "constant / ConstLinearLW"] 
-heatmap_comp_0 = plot_heatmaps_eval(data_comp.trajectories, data_comp.Δt_sample, 0;  layer=8, titles=TITLES)
-heatmap_comp_7 = plot_heatmaps_eval(data_comp.trajectories, data_comp.Δt_sample, 7;  layer=8, titles=TITLES)
-heatmap_comp_30 = plot_heatmaps_eval(data_comp.trajectories, data_comp.Δt_sample, 30;  layer=8, titles=TITLES)
-heatmap_comp_90 = plot_heatmaps_eval(data_comp.trajectories, data_comp.Δt_sample, 90;  layer=8, titles=TITLES)
+crange = target_colorrange(data_comp.trajectories.target; layer = 8)
+heatmap_comp_0 = plot_heatmaps_eval(data_comp.trajectories, data_comp.Δt_sample, 0;  layer=8, titles=titles, colorrange=crange)
+heatmap_comp_7 = plot_heatmaps_eval(data_comp.trajectories, data_comp.Δt_sample, 7;  layer=8, titles=titles, colorrange=crange)
+heatmap_comp_30 = plot_heatmaps_eval(data_comp.trajectories, data_comp.Δt_sample, 30;  layer=8, titles=titles, colorrange=crange)
+heatmap_comp_90 = plot_heatmaps_eval(data_comp.trajectories, data_comp.Δt_sample, 90;  layer=8, titles=titles, colorrange=crange)
 
 
 run_dir = joinpath(@__DIR__, run)
@@ -121,10 +122,11 @@ p_emulator_bias = plot_comparison(
 )
 
 titles = ["target / OneBandLongwave", "neural / NeuralLinearLW"] 
-heatmap_emulator_0 = plot_heatmaps_eval(data_emulator.trajectories, data_emulator.Δt_sample, 0;  layer=8, titles=TITLES)
-heatmap_emulator_7 = plot_heatmaps_eval(data_emulator.trajectories, data_emulator.Δt_sample, 7;  layer=8, titles=TITLES)
-heatmap_emulator_30 = plot_heatmaps_eval(data_emulator.trajectories, data_emulator.Δt_sample, 30;  layer=8, titles=TITLES)
-heatmap_emulator_90 = plot_heatmaps_eval(data_emulator.trajectories, data_emulator.Δt_sample, 90;  layer=8, titles=TITLES)
+crange = target_colorrange(data_emulator.trajectories.target; layer = 8)
+heatmap_emulator_0 = plot_heatmaps_eval(data_emulator.trajectories, data_emulator.Δt_sample, 0;  layer=8, titles=titles, colorrange=crange)
+heatmap_emulator_7 = plot_heatmaps_eval(data_emulator.trajectories, data_emulator.Δt_sample, 7;  layer=8, titles=titles, colorrange=crange)
+heatmap_emulator_30 = plot_heatmaps_eval(data_emulator.trajectories, data_emulator.Δt_sample, 30;  layer=8, titles=titles, colorrange=crange)
+heatmap_emulator_90 = plot_heatmaps_eval(data_emulator.trajectories, data_emulator.Δt_sample, 90;  layer=8, titles=titles, colorrange=crange)
 
 
 
