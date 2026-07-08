@@ -59,7 +59,8 @@ function plot_training(
     p1 = Plots.plot(
         loss;
         ylabel = "Loss",
-        yscale = :log10, 
+        yscale = :log10,
+        legend = false, 
         loss_kwargs...,
     )
 
@@ -67,7 +68,8 @@ function plot_training(
     p2 = Plots.plot(
         pnorm;
         ylabel = "Parameter norm",
-        yscale = :log10, 
+        yscale = :log10,
+        legend = false,  
         pnorm_kwargs...,
     )
 
@@ -76,11 +78,15 @@ function plot_training(
         gnorm;
         xlabel="Training step",
         ylabel="Gradient norm",
-        yscale=:log10, 
+        yscale=:log10,
+        legend = false,  
         gnorm_kwargs...,
     )
 
-    return Plots.plot(p1, p2, p3; layout=(3, 1), title="Training Values", plot_kwargs...)
+    defaults = (; size = (600, 900), left_margin = 8Plots.mm)
+    merged = merge(defaults, plot_kwargs)
+
+    return Plots.plot(p1, p2, p3; layout=(3, 1), merged...)
 end
 
 # Plot timeseries of loss, parameter- and gradient norm of a training run from file
@@ -163,32 +169,31 @@ end
 
 
 
-# Plot timeseries of two fields in respect to a given metric
+# XXX
 function plot_comparison(
-    target::NamedTuple,
-    comp::NamedTuple;
+    reference::NamedTuple,        # gemeinsame Referenz, z.B. data.trajectories.base
+    others::NamedTuple;           # (; comp=…, target=…) → Keys werden Legende
     metric = rmse,
-    Δt_sec,
+    Δt_sample,                    # umbenannt: Sekunden PRO Snapshot (= n_gap·Δt_sec)
+    ylabels = (;),
     kwargs...,
 )
-    fields = keys(target)
+    fields = keys(reference)      # Variablen, z.B. (:temperature,)
 
     panels = map(enumerate(fields)) do (i, field)
-        traj_t = target[field]
-        traj_c = comp[field]
-        t_days = (0:length(traj_t)-1) .* Δt_sec ./ (60 * 60 * 24)
+        ref    = reference[field]
+        t_days = (0:length(ref)-1) .* Δt_sample ./ 86400
+        xlab   = i == length(fields) ? "Time (days)" : ""
 
-        xlab = i == length(fields) ? "Time (days)" : ""
-        Plots.plot(t_days, metric.(traj_t, traj_c);
-                   ylabel = string(field), xlabel = xlab, legend = false)
+        p = Plots.plot(; ylabel = string(field), xlabel = xlab)
+        for (name, other) in pairs(others)                       # eine Linie pro „other"
+            Plots.plot!(p, t_days, metric.(ref, other[field]); label = string(name), lw = 2)
+        end
+        p
     end
 
-    return Plots.plot(
-        panels...;
-        layout = (length(panels), 1),
-        plot_title = "Comparison ($(uppercase(string(metric))))",
-        kwargs...,
-    )
+    return Plots.plot(panels...; layout = (length(panels), 1),
+        plot_title = "Rollout Comparison ($(uppercase(string(metric))))", kwargs...)
 end
 
 
