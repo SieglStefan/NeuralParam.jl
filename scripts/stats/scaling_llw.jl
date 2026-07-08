@@ -17,30 +17,32 @@ using CairoMakie
 
 
 
+
 # Choose calibrated model and define number of vertical layers
-const NAME = ""             # name of the scaling stats file
-const PARAM_NAME = ""       # name of the parameterization file
-const NLAYERS = 8           # number of vertical layers
+NAME = ""             # name of the scaling stats file
+scheme_run = "run_T31_L8_2026-07-07_23-22-44"
+PARAM_NAME = "scheme.jld2"       # name of the parameterization file
+NLAYERS = 8           # number of vertical layers
 
 
 # Folder for stats files (.jld2, .png)
 foldername = "scaling_llw_L$(NLAYERS)$(NAME)"
 folderpath = joinpath(@__DIR__, "..", "..", "data", "stats", foldername)
-mkdir(folderpath)
+mkpath(folderpath)
 
 
 
 ### Load ConstLinearLW parameterization
 # Create parameterization filepath
-path = joinpath(@__DIR__, "..", "..", "data", "params")
-file = PARAM_NAME * ".jld2"
+path = joinpath(@__DIR__, "..", "..", "results", "1_ConstLinearLW", "calibration", scheme_run)
 
 # Load parameterization
-const_linear_lw = NeuralParam.load(; path, file)
+scheme = NeuralParam.load_scheme(; path, file=PARAM_NAME)
 
-# Extract scaling
-sc_a = const_linear_lw.ps.a
-sc_b = const_linear_lw.ps.b
+# Extract parameter and calculate scaling
+sc_a = abs.(scheme.ps.a .* scheme.scaling.sc_a) 
+sc_b = abs.(scheme.ps.b .* scheme.scaling.sc_b) 
+
 
 
 
@@ -67,8 +69,8 @@ ax_a = Axis(
     yreversed = true,
 )
 
-lines!(ax_a, sc_a, layers)
-scatter!(ax_a, sc_a, layers)
+CairoMakie.lines!(ax_a, sc_a, layers)
+CairoMakie.scatter!(ax_a, sc_a, layers)
 
 # Parameter b
 ax_b = Axis(
@@ -80,8 +82,8 @@ ax_b = Axis(
     yreversed = true,
 )
 
-lines!(ax_b, sc_b, layers)
-scatter!(ax_b, sc_b, layers)
+CairoMakie.lines!(ax_b, sc_b, layers)
+CairoMakie.scatter!(ax_b, sc_b, layers)
 
 # Display plot
 display(fig)
