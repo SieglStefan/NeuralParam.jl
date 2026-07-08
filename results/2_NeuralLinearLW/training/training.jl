@@ -1,6 +1,5 @@
 ### XXX
 
-using Revise
 using NeuralParam
 using SpeedyWeather
 using Dates
@@ -22,7 +21,13 @@ mkdir(output_path)
 
 output_config = OutputConfig(output_path = output_path)
 
-run_config = RunConfig()
+run_config = RunConfig(
+    seed = 42,
+    n_traj = 20,
+    n_epochs = 5,
+    n_steps_0 = 20,
+    n_steps_inc = 10,
+)
 
 param, L, PN, GN = run_training(
     SG, 
