@@ -20,14 +20,8 @@ spectral_grid = SpectralGrid(trunc=TRUNC, nlayers=NLAYERS)
 
 
 run_const = "run_T31_L8_2026-07-07_23-22-44"
-scheme_const = load_scheme(
+scheme_comp = load_scheme(
     path = joinpath(@__DIR__, "..", "calibration", run_const),
-    file = "scheme.jld2"
-)
-
-run_neural = "run_T31_L8_2026-07-07_23-22-44"
-scheme_neural = load_scheme(
-    path = joinpath(@__DIR__, "..", "calibration", run_neural),
     file = "scheme.jld2"
 )
 
