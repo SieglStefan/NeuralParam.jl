@@ -6,8 +6,9 @@
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=4
 #SBATCH --time=04:00:00
-#SBATCH --output=results/1_ConstLinearLW/calibration/%x-%j.out
-#SBATCH --error=results/1_ConstLinearLW/calibration/%x-%j.err
+#SBATCH --array=0-4                                            
+#SBATCH --output=results/1_ConstLinearLW/calibration/%x-%A_%a.out  
+#SBATCH --error=results/1_ConstLinearLW/calibration/%x-%A_%a.err
 
 set -euo pipefail
 module purge
