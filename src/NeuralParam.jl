@@ -84,6 +84,7 @@ export
         # utils.jl
                 extract_layer,
                 target_colorrange,
+                steps_from_days,
 
 
         ### architectures

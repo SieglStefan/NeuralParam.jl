@@ -16,3 +16,7 @@ function target_colorrange(traj; layer)
     end
     return extrema(vals)
 end
+
+
+
+steps_from_days(days, Δt_sec) = round(Int, days * 86400 / Δt_sec)
