@@ -19,7 +19,7 @@ SAMPLE_RES = 1
 spectral_grid = SpectralGrid(trunc=TRUNC, nlayers=NLAYERS)
 
 
-run_neural = "run_T31_L8_2026-07-08_20-49-59"
+run_neural = "run_T31_L8_2026-07-09_01-02-13"
 scheme_neural = load_scheme(
     path = joinpath(@__DIR__, "..", "training", run_neural),
     file = "scheme.jld2"
@@ -78,7 +78,7 @@ heatmap_comp_30 = plot_heatmaps_eval(data_comp.trajectories, data_comp.Δt_sampl
 heatmap_comp_90 = plot_heatmaps_eval(data_comp.trajectories, data_comp.Δt_sample, 90;  layer=8, titles=titles, colorrange=crange)
 
 
-run_dir = joinpath(@__DIR__, run)
+run_dir = joinpath(@__DIR__, run_neural)
 mkpath(run_dir)
 mkpath(joinpath(run_dir, "plots_rollout"))
 
@@ -102,7 +102,7 @@ data_emulator = sample_sims(
     fac_pert_T = 2f0,
     fac_pert_q = 0f0,
     t_spinup = Day(31),
-    sim_time = 180,
+    sim_time = 365,
     sample_gap = SAMPLE_RES,
 )
 

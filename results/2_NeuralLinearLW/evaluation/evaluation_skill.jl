@@ -62,7 +62,7 @@ SAMPLE_RES = 1
 
 spectral_grid = SpectralGrid(trunc=TRUNC, nlayers=NLAYERS)
 
-run_neural = "run_T31_L8_2026-07-08_20-49-59"
+run_neural = "run_T31_L8_2026-07-09_01-02-13"
 scheme_neural = load_scheme(
     path = joinpath(@__DIR__, "..", "training", run_neural),
     file = "scheme.jld2"
@@ -78,7 +78,7 @@ scheme_constant = load_scheme(
 model = PrimitiveWetModel(spectral_grid)
 
 n_steps = steps_from_days(1, model.time_stepping.Δt_sec)
-
+ 
 
 data = forecast_skill(
     spectral_grid,
@@ -94,8 +94,9 @@ data = forecast_skill(
     seed = 42
 )
 
-@show mean(data.rmse_vals[:neural])   mean(data.bias_vals[:neural])
-@show mean(data.rmse_vals[:constant]) mean(data.bias_vals[:constant])
+mean(data.rmse_vals[:neural])   
+mean(data.rmse_vals[:constant]) 
+
 
 
 histogram( data.rmse_vals[:neural];   bins=30, alpha=0.5, label="neural",
