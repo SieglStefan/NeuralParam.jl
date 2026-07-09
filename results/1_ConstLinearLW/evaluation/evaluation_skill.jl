@@ -87,16 +87,26 @@ data = forecast_skill(
     seed = 42
 )
 
-@show mean(data.rmse_vals[:comp]) mean(data.bias_vals[:comp])
-@show mean(data.rmse_vals[:none]) mean(data.rmse_vals[:uncal])
+@show mean(data.rmse_vals[:comp]) 
+@show mean(data.rmse_vals[:uncal]) 
+@show mean(data.rmse_vals[:none])
 
 
-histogram(data.rmse_vals[:comp]; bins=30, xlabel="RMSE (K)", ylabel="Segmente",
-          title="1-day forecast RMSE — comp", legend=false)
 
 
-plot_heatmaps(extract_layer(8, [data.err_field[:comp]]); titles=["comp — mean 1d error, layer 8"])
+
+histogram( data.rmse_vals[:comp];   bins=30, alpha=0.5, label="comp",
+           xlabel="RMSE (K)", ylabel="Segmente", title="1-day forecast RMSE")
+histogram!(data.rmse_vals[:uncal]; bins=30, alpha=0.5, label="uncalibrated")
+histogram!(data.rmse_vals[:none]; bins=30, alpha=0.5, label="none")
+
+plot_heatmaps(
+    extract_layer(5, [data.err_field[:comp]]);
+    titles = ["ConstLinearLW — mean 1d error, layer 5"])
 
 
-prof(f) = [Statistics.mean(abs.(f[:, k])) for k in 1:NLAYERS]   # mittlerer |Fehler| pro Schicht
-plot(prof(data.err_field[:comp]), 1:NLAYERS; yflip=true, xlabel="mean |error| (K)", ylabel="Layer", marker=:circle)
+prof(f) = [Statistics.mean(abs.(f[:, k])) for k in 1:NLAYERS]
+plot( prof(data.err_field[:comp]),   1:NLAYERS; yflip=true, label="comp",
+      xlabel="mean |error| (K)", ylabel="Layer", marker=:circle, legend=:bottomright)
+Plots.plot!(prof(data.err_field[:uncal]), 1:NLAYERS; label="uncal", marker=:circle)
+Plots.plot!(prof(data.err_field[:none]), 1:NLAYERS; label="none", marker=:circle)
