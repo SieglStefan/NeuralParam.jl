@@ -110,7 +110,9 @@ arch_meta(c::MLPConfig) = Dict(
 
 # Define meta data for a ConstLinearLW parameterization
 meta_scheme(s::ConstLinearLW) = Dict(
-    "scheme"    =>  "ConstLinearLW"
+    "scheme"    =>  "ConstLinearLW",
+    "init_a"    =>  s.ps.a,
+    "init_b"    =>  s.ps.b,
 )
 
 # Define meta data for a NeuralLinearLW parameterization

@@ -11,17 +11,17 @@
     seed::Int = 1234                # seed for RNG
 
     eta0::Float32 = 1f-3            # initial learning rate       
-    eta_decay::Float32 = 0.7f0      # learning rate decay after an ic         
+    eta_decay::Float32 = 0.5f0      # learning rate decay after an ic         
     patience::Int = 5               # nr. of ic after training stops if no loss improvement
     min_delta::Float32 = 1f-4       # minimum loss difference for early training stop
 
     t_spinup = Day(31)              # spinup time before training
 
     n_ic::Int = 5                   # nr. of ic used for training
-    n_traj::Int = 10                # nr. of trajectroies per ic u.f.t.
-    n_epochs::Int = 10              # nr. of epochs per trajectory u.f.t.
-    n_steps_0::Int = 10             # nr. of initial training steps per update
-    n_steps_inc::Int = 2            # increase of n_steps after an ic
+    n_traj::Int = 20                # nr. of trajectroies per ic u.f.t.
+    n_epochs::Int = 5               # nr. of epochs per trajectory u.f.t.
+    n_steps_0::Int = 20             # nr. of initial training steps per update
+    n_steps_inc::Int = 10           # increase of n_steps after an ic
     n_gap::Int = 25                 # nr. of timestep!() between two trajectories
                    
     fac_pert_T::Float32 = 2f0       # additive perturbation factor for temperature

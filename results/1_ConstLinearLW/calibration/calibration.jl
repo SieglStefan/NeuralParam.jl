@@ -5,56 +5,54 @@ using NeuralParam
 using SpeedyWeather
 using Dates
 
+
 TRUNC = 31
 NLAYERS = 8
-
 SG = SpectralGrid(trunc=TRUNC, nlayers=NLAYERS)
+N_IC_DEFAULT = parse(Int, get(ENV, "N_IC", "5"))     # von launch.sh, sonst 5
 
 
 
-task = parse(Int, get(ENV, "SLURM_ARRAY_TASK_ID", "0"))   # 0..4 (lokal Default 0)
+task = parse(Int, get(ENV, "SLURM_ARRAY_TASK_ID", "0"))
 
-# 5 verschiedene Start-a,b (alle a<0)
-inits = [
-    (; a = fill(-0.01f0, NLAYERS), b = fill(0.01f0, NLAYERS)),
-    (; a = fill(-0.1f0, NLAYERS), b = fill(0.1f0,   NLAYERS)),
-    (; a = fill(-1f0,   NLAYERS), b = fill(1f0,   NLAYERS)),
-    (; a = fill(-10f0,   NLAYERS), b = fill(10f0, NLAYERS)),
-    (; a = fill(-100f0,   NLAYERS), b = fill(100f0,   NLAYERS)),
+variants = [ 
+    
+    (; a=fill(-1f0,NLAYERS),   b=fill(1f0,NLAYERS)),     # task 0 default
+    
+    (; a = fill(-0.1f0, NLAYERS), b = fill(0.1f0,   NLAYERS)),                  # task 1  ┐
+    (; a = fill(-0.1f0, NLAYERS), b = fill(10f0,    NLAYERS)),                  # task 2  │ nur für Multi
+    (; a = fill(-10f0,  NLAYERS), b = fill(0.1f0,   NLAYERS),   n_ic = 8),                  # task 3  │ (Init-Test)
+    (; a = fill(-10f0,  NLAYERS), b = fill(10f0,    NLAYERS),   n_ic = 8),      # task 4  ┘
+
+    (; a = fill(-0.0001f0, NLAYERS), b = fill(1f0, NLAYERS),   n_ic = 8),                # task 1  ┐
+    (; a = fill(-1f0, NLAYERS), b = fill(0.0001f0f0, NLAYERS),   n_ic = 8),                  # task 2  │ nur für Multi
 ]
-ps0 = inits[task + 1]                                     # Julia 1-basiert → +1
 
 
-
-scaling = Scaling(NLAYERS)
-scheme = ConstLinearLW(scaling, ps0)
-
-timestamp = Dates.format(now(), "yyyy-mm-dd_HH-MM-SS")
+v = variants[task + 1]
+ps = (; a=v.a, b=v.b)
+n_ic = get(v, :n_ic, N_IC_DEFAULT)
 
 
+# --- Run-Ordner (gemeinsam für alle Tasks einer Array; lokal: Timestamp) ---
+RUN = get(ENV, "RUN", "run_$(Dates.format(now(), "yyyy-mm-dd_HH-MM-SS"))")
+output_path = joinpath(@__DIR__, RUN, "task_$(task)")  
 
-
-job_id = get(ENV, "SLURM_ARRAY_JOB_ID", "local")
-output_path = joinpath(
-    @__DIR__,
-    "init_test",
-    "job_$(job_id)",
-    "init_$(task)",
-)
-
-
-
-
-
-
+isdir(output_path) && error("Ordner existiert schon: $output_path — abgebrochen (nicht überschrieben).")
 mkpath(output_path)
 
-output_config = OutputConfig(output_path = output_path)
-calibration_config = RunConfig(eta0 = 1f-2)
 
-param, L, PN, GN = run_training(
-    SG, 
-    scheme; 
-    run_config = calibration_config, 
-    output_config, 
-    test_mode=false)
+# --- Kalibrieren ---
+scheme = ConstLinearLW(Scaling(NLAYERS), ps)
+run_config    = RunConfig(
+    eta0 = 1f-2, 
+    n_ic = n_ic,
+    n_traj = 20,
+    n_epochs = 10,
+    n_steps_0 = 10,
+    n_steps_inc = 2,
+    n_gap = 25)
+
+output_config = OutputConfig(output_path = output_path)
+
+param, L, PN, GN = run_training(SG, scheme; run_config, output_config, test_mode = false)
