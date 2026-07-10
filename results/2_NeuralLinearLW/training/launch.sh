@@ -7,7 +7,7 @@ RUN="run_${NAME:+${NAME}_}$(date +%Y-%m-%d_%H-%M-%S)"
 RUNPATH="results/2_NeuralLinearLW/training/$RUN"
 mkdir -p "$RUNPATH"
 
-sbatch --array="$ARRAY" \
+sbatch --job-name="$NLLW_train_${NAME:-run}" --array="$ARRAY" \
        --output="$RUNPATH/slurm-%A_%a.out" \
        --error="$RUNPATH/slurm-%A_%a.err" \
        --export=ALL,RUN="$RUN",N_IC="$NIC" \

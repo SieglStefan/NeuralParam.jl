@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --job-name=calib_constlinearlw
+#SBATCH --job-name=train_neurallinearlw
 #SBATCH --partition=standard
 #SBATCH --qos=short
 #SBATCH --nodes=1
