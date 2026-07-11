@@ -60,8 +60,8 @@ output_config = OutputConfig(output_path = output_path)
 run_config = RunConfig(
     model_type = model_type,
     n_ic = n_ic,
-    n_traj = 20,
-    n_epochs = 10,
+    n_traj = 10,
+    n_epochs = 5,
     n_steps_0 = n_steps_0,
     n_steps_inc = n_steps_inc,
     n_gap  = 25,

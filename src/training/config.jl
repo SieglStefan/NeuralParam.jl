@@ -13,8 +13,6 @@
 
     eta0::Float32 = 1f-3            # initial learning rate       
     eta_decay::Float32 = 0.5f0      # learning rate decay after an ic         
-    patience::Int = 5               # nr. of ic after training stops if no loss improvement
-    min_delta::Float32 = 1f-4       # minimum loss difference for early training stop
 
     t_spinup = Day(31)              # spinup time before training
 

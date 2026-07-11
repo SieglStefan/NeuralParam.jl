@@ -21,12 +21,11 @@ variants = [
     
     (; a = fill(-0.1f0, NLAYERS), b = fill(0.1f0,   NLAYERS)),                  # task 1  ┐
     (; a = fill(-0.1f0, NLAYERS), b = fill(10f0,    NLAYERS)),                  # task 2  │ nur für Multi
-    (; a = fill(-10f0,  NLAYERS), b = fill(0.1f0,   NLAYERS),   n_ic = 8),                  # task 3  │ (Init-Test)
-    (; a = fill(-10f0,  NLAYERS), b = fill(10f0,    NLAYERS),   n_ic = 8),      # task 4  ┘
-    (; a = fill(-0.0001f0, NLAYERS), b = fill(1f0, NLAYERS),   n_ic = 8),                # task 1  ┐
-    (; a = fill(-1f0, NLAYERS), b = fill(0.0001f0, NLAYERS),   n_ic = 8),                  # task 2  │ nur für Multi
+    (; a = fill(-10f0,  NLAYERS), b = fill(0.1f0,   NLAYERS)),                  # task 3  │ (Init-Test)
+    (; a = fill(-10f0,  NLAYERS), b = fill(10f0,    NLAYERS)),      # task 4  ┘
 
-    (;model_type = PrimitiveDryModel),     # task 0 default
+    (; a = fill(-0.0001f0, NLAYERS), b = fill(1f0, NLAYERS)),                # task 1  ┐
+    (; a = fill(-1f0, NLAYERS), b = fill(0.0001f0, NLAYERS)),                  # task 2  │ nur für Multi
 ]
 
 
@@ -57,11 +56,11 @@ run_config    = RunConfig(
     model_type = model_type,
     eta0 = 1f-2, 
     n_ic = n_ic,
-    n_traj = 20,
-    n_epochs = 10,
+    n_traj = 10,
+    n_epochs = 5,
     n_steps_0 = 10,
     n_steps_inc = 2,
-    n_gap = 25)
+    n_gap = 10)
 
 output_config = OutputConfig(output_path = output_path)
 

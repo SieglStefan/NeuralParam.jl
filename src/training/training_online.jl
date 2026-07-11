@@ -39,7 +39,7 @@ function training_online(;
 )
 
     # Unpack run config parameters
-    (; eta_decay, patience, min_delta,
+    (; eta_decay,
     n_ic, n_traj, n_epochs, n_steps_0, n_steps_inc, n_gap,
     ) = run_config
 
@@ -50,11 +50,6 @@ function training_online(;
 
     # Setup optimiser
     opt_state, eta = setup_optimiser(run_config, ps=lw_radiation_train.ps)
-   
-    # Define variables for training control
-    best_loss = Inf32
-    stale = 0
-    best_ps = deepcopy(lw_radiation_train.ps)
 
 
     # Setup simulations
@@ -202,20 +197,6 @@ function training_online(;
         eta *= eta_decay
         Optimisers.adjust!(opt_state, eta)
 
-        loss_ic_mean = mean(L[end-n_traj*n_epochs+1:end])
-
-        if loss_ic_mean < best_loss - min_delta
-            best_loss = loss_ic_mean
-            best_ps = deepcopy(lw_radiation_train.ps)
-            stale = 0
-        else
-            stale += 1
-            if stale >= patience 
-                @warn "Training finished early! (no loss decrease)"
-                break
-            end
-        end
-
 
         # Print IC update
         if output_config.printing_ic
@@ -237,7 +218,7 @@ function training_online(;
     
     @info "Training finished!"
 
-    return update_ps(lw_radiation_train, best_ps), L, PN, GN
+    return lw_radiation_train, L, PN, GN
 end
 
 
