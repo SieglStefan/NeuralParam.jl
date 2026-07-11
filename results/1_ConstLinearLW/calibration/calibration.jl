@@ -25,7 +25,9 @@ variants = [
     (; a = fill(-10f0,  NLAYERS), b = fill(10f0,    NLAYERS)),      # task 4  ┘
 
     (; a = fill(-0.0001f0, NLAYERS), b = fill(1f0, NLAYERS)),                # task 1  ┐
-    (; a = fill(-1f0, NLAYERS), b = fill(0.0001f0, NLAYERS)),                  # task 2  │ nur für Multi
+    (; a = fill(-1f0, NLAYERS), b = fill(0.0001f0, NLAYERS)),
+    
+    (; model_type = PrimitiveDryModel),
 ]
 
 

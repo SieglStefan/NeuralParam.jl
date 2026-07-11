@@ -143,17 +143,18 @@ meta_scheme(s::NeuralABRLWGlobal) = merge(Dict(
 
 # Merge the meta data together
 function build_meta(scheme, target, run_config)
-    target_name = isnothing(target) ? "default" : string(nameof(typeof(target)))
+    target_name = isnothing(target) ? "nothing" : string(nameof(typeof(target)))
+    target_trans = isnothing(target) ? "nothing" : string(nameof(typeof(target.transmissivity)))
+
     return merge(
         meta_scheme(scheme),
         Dict(string(f) => getfield(run_config, f) for f in fieldnames(typeof(run_config))),  # all config fields
         Dict(
             "created"       => string(now()),
             "julia"         => string(VERSION),
-            "target_scheme" => target_name,
             "model_type" => nameof(run_config.model_type),
-            "target_type" => nameof(typeof(target)),
-            "target_transmissivity" => nameof(typeof(target.transmissivity)),
+            "target_scheme" => target_name,
+            "target_transmissivity" => target_trans,
         ),
     )
 end
