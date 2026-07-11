@@ -60,6 +60,7 @@ function training_online(;
     # Setup simulations
     sim_template, sim_train, sim_target = setup_simulations(
         spectral_grid,
+        run_config,
         lw_radiation_train,
         lw_radiation_target,
     )
@@ -310,23 +311,22 @@ end
 
 function setup_simulations(
     spectral_grid,
+    run_config,
     lw_radiation_train,
     lw_radiation_target,
 )
 
     # Create template model and simulationfor later copying
-    model_template = PrimitiveWetModel(; spectral_grid)
+    model_template = run_config.model_type(; spectral_grid)
     sim_template = initialize!(model_template)
 
     # Create target and training simulation and do a first timestep (initalize implicit solver)
-    model_target = isnothing(lw_radiation_target) ?
-        PrimitiveWetModel(; spectral_grid) :
-        PrimitiveWetModel(; spectral_grid, longwave_radiation = lw_radiation_target)
+    model_target = run_config.model_type(; spectral_grid, longwave_radiation = lw_radiation_target)
     sim_target   = initialize!(model_target)
     SpeedyWeather.initialize!(sim_target, steps=0)
     SpeedyWeather.first_timesteps!(sim_target)
 
-    model_train  = PrimitiveWetModel(; spectral_grid, longwave_radiation = lw_radiation_train)
+    model_train  = run_config.model_type(; spectral_grid, longwave_radiation = lw_radiation_train)
     sim_train    = initialize!(model_train)
     SpeedyWeather.initialize!(sim_train, steps=0)
     SpeedyWeather.first_timesteps!(sim_train)

@@ -15,6 +15,11 @@ function perturb_grid_field!(
     rng = Random.default_rng()
 )
     
+    if !hasfield(typeof(sim.variables.grid), var)
+        @warn "Field $var does not exist in used model — perturbation skipped!." 
+        return nothing
+    end
+
     # Initalize simulation (fill variables.grid if not initialized yet)
     SpeedyWeather.initialize!(sim, steps=0)
 

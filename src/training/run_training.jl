@@ -7,8 +7,8 @@
 # Run a training for a longwave parameterization
 function run_training(
     spectral_grid,               
-    lw_radiation_train;
-    lw_radiation_target = nothing,             
+    lw_radiation_train,
+    lw_radiation_target;             
     run_config = RunConfig(),
     output_config = OutputConfig(),
     test_mode = false,

@@ -9,6 +9,7 @@
 # Struct holdind training run configuration parameters
 @kwdef struct RunConfig
     seed::Int = 1234                # seed for RNG
+    model_type::Type = PrimitiveWetModel
 
     eta0::Float32 = 1f-3            # initial learning rate       
     eta_decay::Float32 = 0.5f0      # learning rate decay after an ic         

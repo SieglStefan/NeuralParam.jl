@@ -151,6 +151,9 @@ function build_meta(scheme, target, run_config)
             "created"       => string(now()),
             "julia"         => string(VERSION),
             "target_scheme" => target_name,
+            "model_type" => nameof(run_config.model_type),
+            "target_type" => nameof(typeof(target)),
+            "target_transmissivity" => nameof(typeof(target.transmissivity)),
         ),
     )
 end

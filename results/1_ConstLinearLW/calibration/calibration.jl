@@ -17,22 +17,31 @@ task = parse(Int, get(ENV, "SLURM_ARRAY_TASK_ID", "0"))
 
 variants = [ 
     
-    (; a=fill(-1f0,NLAYERS),   b=fill(1f0,NLAYERS)),     # task 0 default
+    (;),     # task 0 default
     
     (; a = fill(-0.1f0, NLAYERS), b = fill(0.1f0,   NLAYERS)),                  # task 1  ┐
     (; a = fill(-0.1f0, NLAYERS), b = fill(10f0,    NLAYERS)),                  # task 2  │ nur für Multi
     (; a = fill(-10f0,  NLAYERS), b = fill(0.1f0,   NLAYERS),   n_ic = 8),                  # task 3  │ (Init-Test)
     (; a = fill(-10f0,  NLAYERS), b = fill(10f0,    NLAYERS),   n_ic = 8),      # task 4  ┘
-
     (; a = fill(-0.0001f0, NLAYERS), b = fill(1f0, NLAYERS),   n_ic = 8),                # task 1  ┐
     (; a = fill(-1f0, NLAYERS), b = fill(0.0001f0, NLAYERS),   n_ic = 8),                  # task 2  │ nur für Multi
+
+    (;model_type = PrimitiveDryModel),     # task 0 default
 ]
 
 
 v = variants[task + 1]
-ps = (; a=v.a, b=v.b)
+a = get(v, :a, fill(-1f0, NLAYERS))
+b = get(v, :b, fill(1f0, NLAYERS))
+ps = (; a=a, b=b)
+
 n_ic = get(v, :n_ic, N_IC_DEFAULT)
 
+model_type = get(v, :model_type, PrimitiveWetModel)
+transmissivity = model_type === PrimitiveDryModel ?
+    ConstantLongwaveTransmissivity(SG) :
+    FriersonLongwaveTransmissivity(SG)
+target = OneBandLongwave(SG; transmissivity)
 
 # --- Run-Ordner (gemeinsam für alle Tasks einer Array; lokal: Timestamp) ---
 RUN = get(ENV, "RUN", "run_$(Dates.format(now(), "yyyy-mm-dd_HH-MM-SS"))")
@@ -45,6 +54,7 @@ mkpath(output_path)
 # --- Kalibrieren ---
 scheme = ConstLinearLW(Scaling(NLAYERS), ps)
 run_config    = RunConfig(
+    model_type = model_type,
     eta0 = 1f-2, 
     n_ic = n_ic,
     n_traj = 20,
@@ -55,4 +65,10 @@ run_config    = RunConfig(
 
 output_config = OutputConfig(output_path = output_path)
 
-param, L, PN, GN = run_training(SG, scheme; run_config, output_config, test_mode = false)
+param, L, PN, GN = run_training(
+    SG,
+    scheme,
+    target; 
+    run_config, 
+    output_config, 
+    test_mode = false)

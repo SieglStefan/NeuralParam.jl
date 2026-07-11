@@ -23,6 +23,8 @@ variants = [ (; ),
     (; width = 32, n_hidden = 2),
     (; width = 128, n_hidden = 1),
     (; width = 128, n_hidden = 2),
+
+    (; model_type = PrimitiveDryModel),     # task 0 default
 ]
 
 
@@ -32,6 +34,12 @@ width = get(v, :width, 32)
 n_hidden = get(v, :n_hidden, 2)
 n_steps_0 = get(v, :n_steps_0, 10)
 n_steps_inc = get(v, :n_steps_inc, 5)
+
+model_type = get(v, :model_type, PrimitiveWetModel)
+transmissivity = model_type === PrimitiveDryModel ?
+    ConstantLongwaveTransmissivity(SG) :
+    FriersonLongwaveTransmissivity(SG)
+target = OneBandLongwave(SG; transmissivity)
 
 
 
@@ -46,11 +54,11 @@ mkpath(output_path)
 
 arch = MLPConfig(width = width, n_hidden = n_hidden)
 
-lw_radiation_target = OneBandLongwave(SG)
 scheme = NeuralLinearLW(SG, arch)
 output_config = OutputConfig(output_path = output_path)
 
 run_config = RunConfig(
+    model_type = model_type,
     n_ic = n_ic,
     n_traj = 20,
     n_epochs = 10,
@@ -61,8 +69,8 @@ run_config = RunConfig(
 
 param, L, PN, GN = run_training(
     SG, 
-    scheme; 
-    lw_radiation_target,
+    scheme, 
+    target;
     run_config, 
     output_config, 
     test_mode=false)
