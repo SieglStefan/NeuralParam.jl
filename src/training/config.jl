@@ -12,7 +12,7 @@
     model_type::Type = PrimitiveWetModel
 
     eta0::Float32 = 1f-3            # initial learning rate       
-    eta_decay::Float32 = 0.5f0      # learning rate decay after an ic         
+    eta_decay::Float32 = 0.9f0      # learning rate decay after an ic         
 
     t_spinup = Day(31)              # spinup time before training
 
