@@ -20,3 +20,11 @@ end
 
 
 steps_from_days(days, Δt_sec) = round(Int, days * 86400 / Δt_sec)
+
+
+# XXX
+function sample_start_date(ic, n_ic; year=2000)
+    bin = 365 / n_ic
+    doy = (ic-1)*bin + rand()*bin
+    return DateTime(year, 1, 1) + Day(floor(Int, doy))
+end

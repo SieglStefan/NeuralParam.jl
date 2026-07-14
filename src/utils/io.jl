@@ -39,6 +39,20 @@ load_stats(folder; file="stats.jld2") = JLD2.load(joinpath(@__DIR__, "..", "..",
 
 
 
+# Save a forecast-skill reference dataset (.jld2)
+function save_reference(reference; path="", file="reference.jld2")
+    mkpath(path)
+    filepath = joinpath(path, file)
+    JLD2.jldsave(filepath; reference)
+    @info "Reference dataset stored at $(filepath)!"
+    return filepath
+end
+
+# Load a forecast-skill reference dataset
+load_reference(; path="", file="reference.jld2") = JLD2.load(joinpath(path, file), "reference")
+
+
+
 # Intialize .csv file for logging training data and create a meta data overview
 function csv_init(meta, metric_keys; path="", file="")
 
@@ -166,6 +180,8 @@ _toml(x)                = x
 _toml(x::AbstractFloat) = Float64(x)
 _toml(x::Symbol)        = string(x)
 _toml(x::AbstractDict)  = Dict(string(k) => _toml(v) for (k, v) in x)
+_toml(x::NamedTuple)     = Dict(string(k) => _toml(v) for (k, v) in pairs(x))
+_toml(x::AbstractVector) = [_toml(v) for v in x]
 
 # Write stats meta data into .toml file
 function write_info(; path="", file="", kwargs...)
@@ -177,4 +193,29 @@ function write_info(; path="", file="", kwargs...)
     end
     @info "Info file written to $(filepath)!"
     return filepath
+end
+
+
+
+
+# XXX
+function prepare_out_dir(run_dir, folder_name)
+    out_dir = joinpath(run_dir, folder_name)
+
+    if isdir(out_dir)
+        error("Folder already exists ($out_dir): Task canceled! (not overwritten).")
+    end
+    return mkpath(out_dir)
+end
+
+
+# XXX
+function fresh_out_dir(run_dir, folder_name)
+    out_dir = joinpath(run_dir, folder_name)
+
+    if  isdir(out_dir)
+        rm(out_dir; recursive = true) 
+    end
+    
+    return mkpath(out_dir)
 end

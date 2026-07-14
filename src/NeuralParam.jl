@@ -35,13 +35,16 @@ export
         ### utils
         # data.jl
                 perturb_grid_field!,
-                sample_sims,
+                sim_timesteps!,
                 sample_trajectory,
+                
         # device.jl
                         #to_cpu,
         # io.jl
                 save_scheme,
                 load_scheme,
+                save_reference,
+                load_reference,
                         #load_stats,
                         #csv_init,
                         #csw_row!,
@@ -86,7 +89,7 @@ export
                 target_colorrange,
                 steps_from_days,
 
-
+#  XXX !!! ADAPT  training/plotting!
         ### architectures
         # abstract_arch.jl
                         #AbstractArchConfig,
@@ -119,14 +122,26 @@ export
                         #checkpointed_timesteps!,
                         
         # run_training.jl
-                run_training
+                run_training,
         # training_offline
                 # ---
         # training_online
                         #training_online,
                         #online_training_step,
                         #update_ps,
-                        #sim_timesteps!
+
+
+        ### evaluation
+        # rollout.jl
+                rollout_comparison,
+                plot_rollout_curves,
+        # forecast_skill.jl
+                forecast_skill,
+                compare_forecast_skill,
+                plot_skill_curves,
+        # benchmark.jl
+                benchmark_schemes,
+                print_benchmark
 
 
 
@@ -167,6 +182,12 @@ include("training/config.jl")
 include("training/training_online.jl")
 include("training/training_offline.jl")
 include("training/run_training.jl")
+
+
+# Evaluation infrastructure
+include("evaluation/rollout.jl")
+include("evaluation/forecast_skill.jl")
+include("evaluation/benchmark.jl")
 
 
 end

@@ -87,6 +87,11 @@ function NeuralABRLW(
 end
 
 
+# Helper function for updating parameterization parameters
+function update_ps(lw::NeuralABRLW, ps_new)
+    return NeuralABRLW(lw.n_in, lw.n_out, lw.arch_config, lw.zscore, lw.nn, ps_new, lw.st, lw.input_buffer, lw.def_co2, lw.def_ocean_em, lw.def_land_em)
+end
+
 
 # Initializing function for SpeedyWeather (nothing is needed here yet)
 function SpeedyWeather.initialize!(::NeuralABRLW, ::PrimitiveEquation)

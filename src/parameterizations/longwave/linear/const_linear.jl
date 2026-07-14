@@ -38,6 +38,11 @@ function ConstLinearLW(
 end
 
 
+# Helper function for updating parameterization parameters
+function update_ps(lw::ConstLinearLW, ps_new)
+    return ConstLinearLW(lw.scaling, ps_new)
+end
+
 
 # Initializing function for SpeedyWeather (nothing is needed here yet)
 function SpeedyWeather.initialize!(::ConstLinearLW, ::PrimitiveEquation)

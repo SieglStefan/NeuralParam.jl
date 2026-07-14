@@ -90,6 +90,12 @@ function NeuralABRLWGlobal(
 end
 
 
+# Helper function for updating parameterization parameters
+function update_ps(lw::NeuralABRLWGlobal, ps_new)
+    return NeuralABRLWGlobal(lw.n_in, lw.n_out, lw.n_points, lw.arch_config, lw.zscore, lw.nn, ps_new, lw.st, lw.def_co2, lw.def_ocean_em, lw.def_land_em)
+end
+
+
 
 # Define nn input scratch array to avoid allocation
 function SpeedyWeather.variables(scheme::NeuralABRLWGlobal)

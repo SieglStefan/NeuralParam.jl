@@ -51,39 +51,43 @@ end
 
 
 
-function sample_sims(spectral_grid, schemes::NamedTuple; fac_pert_T, fac_pert_q, t_spinup, sim_time, sample_gap)
-    sim_pert = initialize!(PrimitiveWetModel(spectral_grid))
-    (; Δt_sec) = sim_pert.model.time_stepping
-    n_steps = round(Int, sim_time   * 86400 / Δt_sec) + 1
-    n_gap   = round(Int, sample_gap * 86400 / Δt_sec)
 
-    perturb_grid_field!(sim_pert, :temperature; fac_add = fac_pert_T)
-    perturb_grid_field!(sim_pert, :humidity;    fac_mult = fac_pert_q, zeromin = true)
-    run!(sim_pert, period = t_spinup)
+# Propagate a simulation for n_steps using a leapfrog timestep!()
+function sim_timesteps!(sim, n_steps)
 
-    ic = deepcopy(sim_pert.variables)                     # geteilte Anfangsbedingung
+    # Extract time stepping
+    dt = 2 * sim.model.time_stepping.Δt
 
-    trajectories = map(schemes) do scheme
-        model = PrimitiveWetModel(spectral_grid; longwave_radiation = scheme)   # FRISCH — jeder Typ ok, auch nothing
-        sim   = initialize!(model)
-        sample_trajectory(sim, ic; n_steps, n_gap)
+    # Propagate the simulation for n_steps * dt
+    for _ in 1:n_steps
+        SpeedyWeather.timestep!(sim.variables, dt, sim.model, 2, 2)
     end
 
-    return (; trajectories, Δt_sample = n_gap * Δt_sec)
+    return nothing
 end
 
 
 
-
+# Function for sampling a trajectory of sim, starting with ic
 function sample_trajectory(sim, ic; n_steps, n_gap)
+    
+    # Initialize sim, do a first step and set initial condition
     SpeedyWeather.initialize!(sim; steps = n_steps)
     SpeedyWeather.first_timesteps!(sim)
-    copy!(sim.variables, ic)                              # geteilte IC NACH dem Setup → bleibt erhalten (behebt die init-Reihenfolge)
+    copy!(sim.variables, ic)
 
+    # Create container for grid temperatures with a first entry
     data = [copy(sim.variables.grid.temperature)]
+
+    # Loop over steps
     for step in 1:n_steps
+
+        # Do a later  timestep
         SpeedyWeather.later_timestep!(sim)
+
+        # Store temperature after n_gaps
         step % n_gap == 0 && push!(data, copy(sim.variables.grid.temperature))
     end
+
     return (; temperature = data)
 end

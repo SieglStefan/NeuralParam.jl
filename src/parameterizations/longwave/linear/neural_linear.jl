@@ -90,6 +90,12 @@ function NeuralLinearLW(
 end
 
 
+# Helper function for updating parameterization parameters
+function update_ps(lw::NeuralLinearLW, ps_new)
+    return NeuralLinearLW(lw.n_in, lw.n_out, lw.arch_config, lw.zscore, lw.scaling, lw.nn, ps_new, lw.st, lw.input_buffer)
+end
+
+
 
 # Initializing function for SpeedyWeather (nothing is needed here yet)
 function SpeedyWeather.initialize!(::NeuralLinearLW, ::PrimitiveEquation)
