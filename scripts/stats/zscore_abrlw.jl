@@ -365,37 +365,46 @@ println("")
 
 
 
-### Create and store meta data .toml file
 write_info(;
     path = folderpath,
     file = "meta.toml",
 
-    name =          NAME,
-    created =       CREATED,
-    seed =          SEED,
-    julia =         string(VERSION),
+    provenance = (;
+        name    = NAME,
+        created = CREATED,
+        seed    = SEED,
+        julia   = string(VERSION),
+    ),
 
-    inputs =        ["Temperature profile, Humidity profile, surface pressure, CO2 concentration, Sea surface temperature, Land surface temperature, Land fraction, Ocean emissivity, Land Emissivity"],
-    outputs =       ["Tempertaure profile tendencies, Outgoing longwave, Surface longwave down"],
+    io = (;
+        inputs        = ["Temperature profile, Humidity profile, surface pressure, CO2 concentration, Sea surface temperature, Land surface temperature, Land fraction, Ocean emissivity, Land Emissivity"],
+        outputs       = ["Temperature profile tendencies, Outgoing longwave, Surface longwave down"],
+        defaults      = ["CO2 concentration, Ocean emissivity, Land Emissivity"],
+        defaults_vals = [CO2, OCEAN_EM, LAND_EM],
+    ),
+
+    scheme = (;
+        lw_scheme = string(nameof(typeof(LW_SCHEME))),
+    ),
+
+    grid = (;
+        trunc   = TRUNC,
+        nlayers = NLAYERS,
+    ),
+
+    sampling = (;
+        t_spinup   = T_SPINUP,
+        n_ic       = N_IC,
+        sim_time   = SIM_TIME,
+        sample_gap = SAMPLE_GAP,
+        n_stats    = n_steps_total ÷ n_gap,
+        gap_real   = n_gap * Δt_sec / 3600 / 24,
+    ),
     
-    defaults =      ["CO2 concentration, Ocean emissivity, Land Emissivity"],
-    defaults_vals = [CO2, OCEAN_EM, LAND_EM],
-
-    lw_scheme =     string(nameof(typeof(LW_SCHEME))),   
-
-    trunc =         TRUNC,
-    nlayers =       NLAYERS,
-
-    t_spinup =      T_SPINUP,
-    n_ic =          N_IC,
-    sim_time =      SIM_TIME,
-    sample_gap =    SAMPLE_GAP,
-
-    n_stats =       n_steps_total ÷ n_gap,
-    gap_real =      n_gap * Δt_sec /3600 /24,
-
-    amp_t =         AMP_T,
-    amp_q =         AMP_Q,
+    perturbation = (;
+        amp_t = AMP_T,
+        amp_q = AMP_Q,
+    ),
 )
 
 

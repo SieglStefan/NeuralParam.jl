@@ -14,7 +14,7 @@
 
 
 
-### Load packages and code
+### Load packages
 using Revise
 using NeuralParam
 using SpeedyWeather
@@ -24,7 +24,7 @@ using CairoMakie
 
 
 
-### Define stats parameters
+### Define parameters for sampling
 # General
 NAME = ""             # name of statistics
 CREATED = now()       # date of creation
@@ -42,6 +42,7 @@ SAMPLE_GAP = 3.65     # days between sampling
 
 # Perturbation
 AMP_T = 2f0           # temperature perturbation amplitude
+AMP_Q = 0.2f0         # humidity perturbation amplitude (multiplicative)
 
 
 # Folder for stats files (.jld2, .png and .toml)
@@ -228,6 +229,46 @@ write_info(;
     gap_real =      n_gap * Δt_sec /3600 /24,
 
     amp_t =         AMP_T,
+)
+
+write_info(;
+    path = folderpath,
+    file = "meta.toml",
+
+    provenance = (;
+        name    = NAME,
+        created = CREATED,
+        seed    = SEED,
+        julia   = string(VERSION),
+    ),
+
+    io = (;
+        inputs =        ["temperature"],
+        outputs =       ["none: scaled via ConstLinearLW parameters"],
+    ),
+
+    scheme = (;
+        lw_scheme = string(nameof(typeof(LW_SCHEME))),
+    ),
+
+    grid = (;
+        trunc   = TRUNC,
+        nlayers = NLAYERS,
+    ),
+
+    sampling = (;
+        t_spinup   = T_SPINUP,
+        n_ic       = N_IC,
+        sim_time   = SIM_TIME,
+        sample_gap = SAMPLE_GAP,
+        n_stats    = n_steps_total ÷ n_gap,
+        gap_real   = n_gap * Δt_sec / 3600 / 24,
+    ),
+
+    perturbation = (;
+        amp_t = AMP_T,
+        amp_q = AMP_Q,
+    ),
 )
 
 
