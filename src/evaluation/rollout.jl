@@ -4,7 +4,7 @@
 
 
 
-function evaluate_forecast(;
+function evaluate_rollout(
     scheme,                                     # evaluated scheme
     reference;                                  # comparison reference
     spectral_grid,          
@@ -66,22 +66,22 @@ function evaluate_forecast(;
     end
 
     # Calculate mean in respect to all starting days
-    forecast_stats = map(v -> v ./ length(start_days), sums)
+    rollout_stats = map(v -> v ./ length(start_days), sums)
 
 
-    return (; days = 1:max_horizon, curve = forecast_stats, heatmaps = kept_traj)
+    return (; days = 1:max_horizon, curve = rollout_stats, heatmaps = kept_traj)
 end
 
 
 # Wrapper for a list (NamedTuple) of schemes
-function evaluate_forecast(schemes::NamedTuple, reference; kwargs...)
-    return map(scheme -> evaluate_forecast(scheme, reference; kwargs...), schemes)
+function evaluate_rollout(schemes::NamedTuple, reference; kwargs...)
+    return map(scheme -> evaluate_rollout(scheme, reference; kwargs...), schemes)
 end
 
 
 
-# Plot skill curves for every scheme in respect to the metric
-function plot_forecast(;
+# XXX REMOVE Plot skill curves for every scheme in respect to the metric
+function plot_rollout(;
     results::NamedTuple,
     metric::Symbol,
     title::String = "",

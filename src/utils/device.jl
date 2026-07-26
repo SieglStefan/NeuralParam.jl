@@ -1,6 +1,6 @@
 ### Device utilities
 ###
-### Helper functions for hanlding data between devices (cpu and gpu)
+### XXX Helper functions for hanlding data between devices (cpu and gpu)
 
 
 
@@ -23,7 +23,6 @@ function to_cpu(z::ZScoreStats)
         cpu_device()(z.output_std),
     )
 end
-
 
 
 # Define conversion of general LW schemes (everything is already on cpu=

@@ -5,7 +5,7 @@
 
 
 # Compares the computational cost of longwave radiation schemes
-function evaluate_benchmark(;
+function evaluate_benchmark(
     scheme;
     spectral_grid,
     model_type = PrimitiveWetModel,
@@ -16,8 +16,7 @@ function evaluate_benchmark(;
     sim = initialize!(model_type(spectral_grid; longwave_radiation = scheme))
     
     # Initialize steps and do a first timestep
-    SpeedyWeather.initialize!(sim, steps = n_steps+1)
-    SpeedyWeather.first_timesteps!(sim)
+    SpeedyWeather.initialize!(sim, steps = n_steps)
 
 
     # Benchmark
@@ -34,7 +33,7 @@ end
 
 # Wrapper for a list (NamedTuple) of schemes
 function evaluate_benchmark(schemes::NamedTuple; kwargs...)
-    return map(scheme -> evaluate_benchmark(;scheme, kwargs...), schemes)
+    return map(scheme -> evaluate_benchmark(scheme; kwargs...), schemes)
 end
 
 

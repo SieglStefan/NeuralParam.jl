@@ -1,59 +1,51 @@
+### Setup functions
+###
+### XXX Functions for setting up simulations and optimisers for training
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+# Setup simulations for online training loop
 function setup_simulations(
     spectral_grid,
     run_config,
     lw_radiation_train,
-    lw_radiation_target,
 )
 
-    # Create template model and simulationfor later copying
-    model_template = run_config.model_type(; spectral_grid)
+    # Create template model and simulation for later copying
+    model_template = run_config.model(spectral_grid;)
     sim_template = initialize!(model_template)
 
-    # Create target and training simulation and do a first timestep (initalize implicit solver)
-    model_target = run_config.model_type(; spectral_grid, longwave_radiation = lw_radiation_target)
+    # XXX Create target and training simulation and do a first timestep (initalize implicit solver)
+    model_target = run_config.model(spectral_grid; longwave_radiation = run_config.lw_scheme)
     sim_target   = initialize!(model_target)
     SpeedyWeather.initialize!(sim_target, steps=0)
-    SpeedyWeather.first_timesteps!(sim_target)
 
-    model_train  = run_config.model_type(; spectral_grid, longwave_radiation = lw_radiation_train)
+    model_train  = run_config.model(spectral_grid; longwave_radiation = lw_radiation_train)
     sim_train    = initialize!(model_train)
     SpeedyWeather.initialize!(sim_train, steps=0)
-    SpeedyWeather.first_timesteps!(sim_train)
 
     return sim_template, sim_train, sim_target
 end
 
 
 
+# Setup optimiser for online training loop
 function setup_optimiser(
     run_config;
     ps
 )
+
+    # Copy learning rate
     eta = run_config.eta0
 
+    # Setup Optimiser rule
     rule = Optimisers.OptimiserChain(
-        Optimisers.ClipNorm(1f0),
-        Optimisers.WeightDecay(1f-4),
-        Optimisers.Adam(eta),
+        Optimisers.ClipNorm(1f0),           # ClipNorm for stability (limits gradients)
+        Optimisers.WeightDecay(1f-4),       # WeightDecay for stability (limits parameters)
+        Optimisers.Adam(eta),               # Adam optimiser with learning rate eta
     )
 
+    # Define optimiser state
     opt_state = Optimisers.setup(rule, ps)
 
     return opt_state, eta
@@ -61,6 +53,7 @@ end
 
 
 
+# Prepare reference simulation (copying, perturbation, spinup)
 function prepare_reference(sim_template, run_config, n_steps, start_date)
 
     # Copy template simulation for pertubation and set start date
@@ -78,8 +71,7 @@ function prepare_reference(sim_template, run_config, n_steps, start_date)
     sim_ref = deepcopy(sim_pert)
 
     # Initialize reference trajectory and do a first step
-    SpeedyWeather.initialize!(sim_ref, steps = run_config.n_traj * (run_config.n_gap + n_steps) + 1)
-    SpeedyWeather.first_timesteps!(sim_ref)
+    SpeedyWeather.initialize!(sim_ref, steps = run_config.n_traj * (run_config.n_gap + n_steps))
 
     return sim_ref
 end

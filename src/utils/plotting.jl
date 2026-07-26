@@ -1,6 +1,6 @@
 ### Plotting utility functions
 ###
-### Plotting possibilities:
+### XXX Plotting possibilities:
 ### - plot_loss:        
 ###         plots loss of a training run
 ### - plot_training:    

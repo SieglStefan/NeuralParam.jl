@@ -4,7 +4,7 @@
 ### - input variables:
 ###     - temperature per layer k
 ### - output variables:
-###     - nothing: is scaled with ConstLinearLW parameters
+###     - nothing: output is scaled with ConstLinearLW parameters
 ###
 ### Additionally:
 ###     - displays plots of heatmaps of perturbation before and after spinup for checking
@@ -24,31 +24,38 @@ using CairoMakie
 
 
 
+### Define spectral grid
+TRUNC = 31
+NLAYERS = 8
+SG = SpectralGrid(trunc=TRUNC, nlayers=NLAYERS)
+
+
+
 ### Define parameters for sampling
 # General
-NAME = ""             # name of statistics
-CREATED = now()       # date of creation
-SEED = 1234           # seed used    
+NAME = "_default"             # name of statistics
+SEED = 21             # seed used    
 
-# Grid
-TRUNC = 31            # truncation of spectral grid
-NLAYERS = 8           # number of vertical layers
+# Model and scheme
+MODEL = PrimitiveWetModel
+LW_SCHEME = OneBandLongwave(SG; transmissivity = FriersonLongwaveTransmissivity(SG))
 
 # Sampling
 T_SPINUP = 30         # spinup time in days
-N_IC = 5              # number of initial conditions
+START_DATE = Date(2000, 1, 1)   # start date of simulation
+N_IC = 1              # number of initial conditions
 SIM_TIME = 365        # sampling time in days
 SAMPLE_GAP = 3.65     # days between sampling
 
 # Perturbation
-AMP_T = 2f0           # temperature perturbation amplitude
-AMP_Q = 0.2f0         # humidity perturbation amplitude (multiplicative)
+FAC_PERT_T = 2f0           # temperature perturbation amplitude
+FAC_PERT_Q = 0.2f0         # humidity perturbation amplitude (multiplicative)
 
 
-# Folder for stats files (.jld2, .png and .toml)
+# XXX SHIFT IT TO LATER Folder for stats files (.jld2, .png and .toml)
 foldername = "zscore_llw_L$(NLAYERS)$(NAME)"
-folderpath = joinpath(@__DIR__, "..", "..", "data", "stats", foldername)
-mkdir(folderpath)
+base = joinpath(@__DIR__, "..", "..", "data", "stats")
+folderpath = prepare_out_dir(base, foldername)
 
 
 
@@ -56,12 +63,8 @@ mkdir(folderpath)
 # Set seed for reproducability
 Random.seed!(SEED)
 
-# Define spectral grid and model
-spectral_grid = SpectralGrid(trunc=TRUNC, nlayers=NLAYERS)
-LW_SCHEME = OneBandLongwave(spectral_grid)        # used parameterization scheme
-model = PrimitiveWetModel(spectral_grid; longwave_radiation = LW_SCHEME)
-
-# Create template simulation
+# Create model and initialize simulation
+model = MODEL(SG; longwave_radiation = LW_SCHEME)
 sim_temp = initialize!(model)
 
 # Extract timestepping
@@ -69,7 +72,7 @@ sim_temp = initialize!(model)
 
 
 # Calulate number of timesteps for sampling
-n_steps_total = round(Int, SIM_TIME *3600 *24 / Δt_sec) + 1
+n_steps_total = round(Int, SIM_TIME *3600 *24 / Δt_sec)
 n_gap = round(Int, SAMPLE_GAP *3600 *24 / Δt_sec)
 
 
@@ -93,7 +96,7 @@ for i in 1:N_IC
     sim = deepcopy(sim_temp)
     
     # Perturbate temperature field
-    perturb_grid_field!(sim, :temperature; fac_add=AMP_T)
+    perturb_grid_field!(sim, :temperature; fac_add=FAC_PERT_T)
 
 
     # Plot heatmap if first ic for visualization of perturbation before spinup
@@ -120,14 +123,13 @@ for i in 1:N_IC
 
     # Initialize simulation and do a first step
     initialize!(sim; steps=n_steps_total)
-    SpeedyWeather.first_timesteps!(sim)
 
 
     # Propagate the simulation and sample temperature fields
     for step in 1:n_steps_total
 
         # Do a timestep
-        SpeedyWeather.later_timestep!(sim)
+        SpeedyWeather.time_step!(sim)
 
         # Store input temperatures after n_gap steps
         if step % n_gap == 0
@@ -161,11 +163,41 @@ output_std = 0f0
 file = "stats.jld2"
 filepath = joinpath(folderpath, file)
 
-JLD2.jldsave(filepath;
-    input_mean,
-    input_std,
-    output_mean,
-    output_std,
+stats = (; input_mean, input_std, output_mean, output_std)
+save(stats; path=folderpath, file=file)
+
+
+# Create and store info.toml file
+write_info(;
+    path = folderpath,
+    file = "info.toml",
+
+    name =          NAME,
+    created =       now(),
+    seed =          SEED,
+    julia =         string(VERSION),
+    sw              = string(pkgversion(SpeedyWeather)),
+
+    trunc =         TRUNC,
+    nlayers =       NLAYERS,
+
+    model      =    nameof(MODEL),
+    lw_scheme =     string(nameof(typeof(LW_SCHEME))),   
+
+    t_spinup =      T_SPINUP,
+    start_date      = string(START_DATE),
+    n_ic =          N_IC,
+    sim_time =      SIM_TIME,
+    sample_gap =    SAMPLE_GAP,
+
+    n_stats =       n_steps_total ÷ n_gap,
+    gap_real =      n_gap * Δt_sec /3600 /24,
+
+    amp_t           = FAC_PERT_T,
+    amp_q           = FAC_PERT_Q,
+
+    inputs =        ["temperature"],
+    outputs =       ["none: scaled via ConstLinearLW parameters"],
 )
 
 
@@ -199,77 +231,6 @@ display(fig)
 file = "temp_vertical_profile.png"
 filepath = joinpath(folderpath, file)
 CairoMakie.save(filepath, fig)
-
-
-
-### Create and store meta data .toml file
-write_info(;
-    path = folderpath,
-    file = "meta.toml",
-
-    name =          NAME,
-    created =       CREATED,
-    seed =          SEED,
-    julia =         string(VERSION),
-
-    inputs =        ["temperature"],
-    outputs =       ["none: scaled via ConstLinearLW parameters"],
-
-    lw_scheme =     string(nameof(typeof(LW_SCHEME))),   
-
-    trunc =         TRUNC,
-    nlayers =       NLAYERS,
-
-    t_spinup =      T_SPINUP,
-    n_ic =          N_IC,
-    sim_time =      SIM_TIME,
-    sample_gap =    SAMPLE_GAP,
-
-    n_stats =       n_steps_total ÷ n_gap,
-    gap_real =      n_gap * Δt_sec /3600 /24,
-
-    amp_t =         AMP_T,
-)
-
-write_info(;
-    path = folderpath,
-    file = "meta.toml",
-
-    provenance = (;
-        name    = NAME,
-        created = CREATED,
-        seed    = SEED,
-        julia   = string(VERSION),
-    ),
-
-    io = (;
-        inputs =        ["temperature"],
-        outputs =       ["none: scaled via ConstLinearLW parameters"],
-    ),
-
-    scheme = (;
-        lw_scheme = string(nameof(typeof(LW_SCHEME))),
-    ),
-
-    grid = (;
-        trunc   = TRUNC,
-        nlayers = NLAYERS,
-    ),
-
-    sampling = (;
-        t_spinup   = T_SPINUP,
-        n_ic       = N_IC,
-        sim_time   = SIM_TIME,
-        sample_gap = SAMPLE_GAP,
-        n_stats    = n_steps_total ÷ n_gap,
-        gap_real   = n_gap * Δt_sec / 3600 / 24,
-    ),
-
-    perturbation = (;
-        amp_t = AMP_T,
-        amp_q = AMP_Q,
-    ),
-)
 
 
 

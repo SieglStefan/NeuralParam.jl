@@ -19,7 +19,7 @@ using CairoMakie
 
 
 # Choose calibrated model and define number of vertical layers
-NAME = ""             # name of the scaling stats file
+NAME = "_default"             # name of the scaling stats file
 scheme_run = "run_T31_L8_2026-07-07_23-22-44"
 PARAM_NAME = "scheme.jld2"       # name of the parameterization file
 NLAYERS = 8           # number of vertical layers

@@ -26,9 +26,8 @@ using RingGrids
 using Accessors
 
 using Adapt
-using CUDA
-using cuDNN
 using MLDataDevices: cpu_device, gpu_device
+using BenchmarkTools
 
 
 export  
@@ -41,20 +40,19 @@ export
         # device.jl
                         #to_cpu,
         # io.jl
-                save_scheme,
-                load_scheme,
-                save_reference,
-                load_reference,
+                save,
+                load,
                         #load_stats,
                         #csv_init,
                         #csw_row!,
-                csv_info,
                         #csv_read,
                         #arch_meta,
                         #meta_scheme,
                         #build_meta,
                         #_toml,
                 write_info,
+                prepare_out_dir,
+                        #fresh_out_dir,
         # metrics.jl
                 mse,
                 rmse,
@@ -88,6 +86,7 @@ export
                 extract_layer,
                 target_colorrange,
                 steps_from_days,
+                days_from_steps,
 
 #  XXX !!! ADAPT  training/plotting!
         ### architectures
@@ -96,18 +95,24 @@ export
         # mlp.jl
                 MLPConfig,
                         #setup_arch,
+                        #info_arch,
         # rnn.jl
                 # ---
 
         ### parameterizations
         # const_linear.jl
                 ConstLinearLW,
+                        #update_ps,
+                info_scheme,
         # neural_linear.jl
                 NeuralLinearLW,
+                        #update_ps,
         # neural_abr.jl
                 NeuralABRLW,
+                        #update_ps,
         # neural_abr_global.jl
                 NeuralABRLWGlobal,
+                        #update_ps,
 
 
         ### training
@@ -120,7 +125,6 @@ export
         # gradients.jl
                         #compute_gradients,
                         #checkpointed_timesteps!,
-                        
         # run_training.jl
                 run_training,
         # training_offline
@@ -128,20 +132,13 @@ export
         # training_online
                         #training_online,
                         #online_training_step,
-                        #update_ps,
 
 
         ### evaluation
         # rollout.jl
-                rollout_comparison,
-                plot_rollout_curves,
-        # forecast_skill.jl
-                forecast_skill,
-                compare_forecast_skill,
-                plot_skill_curves,
+                evaluate_rollout,
         # benchmark.jl
-                benchmark_schemes,
-                print_benchmark
+                evaluate_benchmark
 
 
 
@@ -178,15 +175,16 @@ include("utils/device.jl")
 # Training infrastructure
 include("training/loss.jl")
 include("training/gradients.jl")
+include("training/setup.jl")
 include("training/config.jl")
 include("training/training_online.jl")
 include("training/training_offline.jl")
 include("training/run_training.jl")
+include("training/plotting.jl")
 
 
 # Evaluation infrastructure
 include("evaluation/rollout.jl")
-include("evaluation/forecast_skill.jl")
 include("evaluation/benchmark.jl")
 
 

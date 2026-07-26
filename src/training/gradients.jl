@@ -10,21 +10,21 @@
 
 
 
-
 # Compute loss and gradients for one trajectory segment
 function compute_gradients(
     vars0, 
     sim_target, 
     sim_train, 
     n_steps,
-    test_mode
+    do_autodiff,
+    grid_weights
 )
 
     # To be trained parameterization used for multiple dispatch only
     para = sim_train.model.longwave_radiation
 
 
-    # Start AD from sim_train's variables (carry nn_input etc.), reset state to the IC
+    # Start AD from sim_train.variables (carry nn_input etc.), reset state to initial variables
     vars_ad = deepcopy(sim_train.variables)
     copy!(vars_ad, vars0)
 
@@ -32,7 +32,7 @@ function compute_gradients(
     bvars_ad = make_zero(vars_ad)
 
     # Seed gradient container and calculate loss
-    loss = seed_loss!(bvars_ad, para, sim_train.variables, sim_target.variables)
+    loss = seed_loss!(bvars_ad, para, sim_train.variables, sim_target.variables, grid_weights)
 
     # Compute metric losses
     metrics = compute_metrics(para, sim_train.variables, sim_target.variables)
@@ -44,7 +44,7 @@ function compute_gradients(
     
 
     # In test mode, skip Enzyme compilation and return zero gradients
-    if test_mode
+    if ~do_autodiff
         return bmodel_ad.longwave_radiation.ps, loss, metrics
     end
 
@@ -78,17 +78,12 @@ function checkpointed_timesteps!(
     model_ad,
     n_steps,
     checkpoint_scheme::Scheme,
-    lf1 = 2,
-    lf2 = 2,
 )
+
+    # Perform n_steps of timestep! with checkpointing for reverse-mode AD
     @ad_checkpoint checkpoint_scheme for _ in 1:n_steps
-        SpeedyWeather.timestep!(
-            vars_ad,
-            2 * model_ad.time_stepping.Δt,
-            model_ad,
-            lf1,
-            lf2,
-        )
+        SpeedyWeather.time_step!(vars_ad, model_ad.time_stepping, model_ad)             # propagate dynamics
+        SpeedyWeather.time_step!(vars_ad.prognostic.clock, model_ad.time_stepping)      # propagate clock
     end
 
     return nothing

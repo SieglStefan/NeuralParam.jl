@@ -1,73 +1,47 @@
 ### IO utilities
 ###
-### Helper functions for saving and loading data and models
+### Helper functions for saving and loading objects and data
 
 
 
-# Saves a parameterization scheme as .jld2
-function save_scheme(scheme; path="", file="")
-
+# Function for saving an object to a .jld2 file
+function save(object; path, file)
+    
+    # Create path and put together filepath
     mkpath(path)
     filepath = joinpath(path, file)
 
-    # Save scheme
-    JLD2.jldsave(filepath; scheme = to_cpu(scheme))
-
-    @info "Scheme stored at $(filepath)!"
+    # Save object
+    JLD2.jldsave(filepath; object)
 
     return filepath
 end
 
+# Function for loading an object from a .jld2 file
+function load(; path, file)
 
-# Loads a .jld2 parameterization scheme
-function load_scheme(; path="", file="")
-
+    # Load object
     filepath = joinpath(path, file)
+    object = JLD2.load(filepath, "object")
 
-    # Load scheme
-    scheme = JLD2.load(filepath, "scheme")
-
-    @info "Scheme loaded from $(filepath)!"
-
-    return scheme
+    return object
 end
 
 
 
-# Load a statistics file (zscore or scaling)
-load_stats(folder; file="stats.jld2") = JLD2.load(joinpath(@__DIR__, "..", "..", "data", "stats", folder, file))
+# Intialize .csv file for logging training data and create a info.toml file for meta data
+function csv_init(metric_keys; path="", file="")
 
-
-
-# Save a forecast-skill reference dataset (.jld2)
-function save_reference(reference; path="", file="reference.jld2")
-    mkpath(path)
-    filepath = joinpath(path, file)
-    JLD2.jldsave(filepath; reference)
-    @info "Reference dataset stored at $(filepath)!"
-    return filepath
-end
-
-# Load a forecast-skill reference dataset
-load_reference(; path="", file="reference.jld2") = JLD2.load(joinpath(path, file), "reference")
-
-
-
-# Intialize .csv file for logging training data and create a meta data overview
-function csv_init(meta, metric_keys; path="", file="")
-
+    # Create path and put together filepath
     mkpath(path)
     filepath = joinpath(path, file)
 
+    # Write header
     open(filepath, "w") do io
-        for (k,v) in meta
-            # Write meta data
-            println(io, "# ", k, " = ", v)
-        end
-        # Write table header
         println(io, "ic,traj,epoch,n_steps,loss,eta,pnorm,gnorm," * join(metric_keys, ","))
     end
 
+    # Print information
     @info ".csv file created and initialized at $(filepath)!"
 
     return filepath
@@ -77,8 +51,10 @@ end
 # Write a row of training data to .csv
 function csv_row!(ic, traj, epoch, n_steps, loss, eta, pnorm, gnorm, metrics; path="", file="")
 
+    # Put together filepath
     filepath = joinpath(path, file)
 
+    # Write a data row
     open(filepath, "a") do io
         println(io, join((ic, traj, epoch, n_steps, loss, eta, pnorm, gnorm, values(metrics)...), ","))
     end
@@ -87,91 +63,31 @@ function csv_row!(ic, traj, epoch, n_steps, loss, eta, pnorm, gnorm, metrics; pa
 end
 
 
-# Read and print meta data of a training .csv file
-function csv_info(; path="", file="")
-
-    filepath = joinpath(path, file)
-    meta = Dict{String,String}()
-
-    # Read meta
-    for line in eachline(filepath)
-        startswith(line, "#") || break           
-        k, v = split(strip(line[2:end]), " = "; limit=2)
-        meta[strip(k)] = strip(v)
-    end
-
-    return meta
-end
-
-
-# Read .csv data for plotting and printing information
+# Read .csv data for plotting
 function csv_read(; path="", file="")
 
+    # Put together filepath
     filepath = joinpath(path, file)
 
+    # Read .csv data
     return CSV.read(filepath, DataFrame; comment="#")
 end
 
 
 
-# Define meta data for a MLP neural network architecture
-arch_meta(c::MLPConfig) = Dict(
-    "n_hidden"  =>  c.n_hidden, 
-    "width"     =>  c.width, 
-    "act"       =>  string(c.act)
-)
 
 
-# Define meta data for a ConstLinearLW parameterization
-meta_scheme(s::ConstLinearLW) = Dict(
-    "scheme"    =>  "ConstLinearLW",
-    "init_a"    =>  s.ps.a,
-    "init_b"    =>  s.ps.b,
-)
-
-# Define meta data for a NeuralLinearLW parameterization
-meta_scheme(s::NeuralLinearLW) = merge(Dict(
-    "scheme"    =>  "NeuralLinearLW",   
-    "n_in"      =>  s.n_in, 
-    "n_out"     =>  s.n_out), 
-    arch_meta(s.arch_config)
-)
-
-# Define meta data for a NeuralABRLW parameterization
-meta_scheme(s::NeuralABRLW) = merge(Dict(
-    "scheme"    =>  "NeuralABRLW",       
-    "n_in"      =>  s.n_in, 
-    "n_out"     =>  s.n_out), 
-    arch_meta(s.arch_config)
-)
-
-# Define meta data for a NeuralABRLWGlobal parameterization
-meta_scheme(s::NeuralABRLWGlobal) = merge(Dict(
-    "scheme"    =>  "NeuralABRLWGlobal", 
-    "n_in"      =>  s.n_in, 
-    "n_out"     =>  s.n_out, 
-    "n_points"  =>  s.n_points), 
-    arch_meta(s.arch_config)
-)
 
 
-# Merge the meta data together
-function build_meta(scheme, target, run_config)
-    target_name = isnothing(target) ? "nothing" : string(nameof(typeof(target)))
-    target_trans = isnothing(target) ? "nothing" : string(nameof(typeof(target.transmissivity)))
 
-    return merge(
-        meta_scheme(scheme),
-        Dict(string(f) => getfield(run_config, f) for f in fieldnames(typeof(run_config))),  # all config fields
-        Dict(
-            "created"       => string(now()),
-            "julia"         => string(VERSION),
-            "model_type" => nameof(run_config.model_type),
-            "target_scheme" => target_name,
-            "target_transmissivity" => target_trans,
-        ),
-    )
-end
+
+
+
+
+
+
+
+
 
 
 
@@ -199,8 +115,8 @@ end
 
 
 # XXX
-function prepare_out_dir(run_dir, folder_name)
-    out_dir = joinpath(run_dir, folder_name)
+function prepare_out_dir(folderpath, folder_name)
+    out_dir = joinpath(folderpath, folder_name)
 
     if isdir(out_dir)
         error("Folder already exists ($out_dir): Task canceled! (not overwritten).")
@@ -210,8 +126,8 @@ end
 
 
 # XXX
-function fresh_out_dir(run_dir, folder_name)
-    out_dir = joinpath(run_dir, folder_name)
+function fresh_out_dir(folderpath, folder_name)
+    out_dir = joinpath(folderpath, folder_name)
 
     if  isdir(out_dir)
         rm(out_dir; recursive = true) 

@@ -1,6 +1,6 @@
 ### Functions for a/b profile evaluation of ConstLinearLW schemes
 ###
-### XXX
+### XXX REMOVE
 
 # Effective heating (dT) of a ConstLinearLW scheme for a given temperature
 effective_heating(s::ConstLinearLW, T) = @. s.ps.a * s.scaling.sc_a * T + s.ps.b * s.scaling.sc_b

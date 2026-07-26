@@ -35,7 +35,7 @@ using CairoMakie
 
 ### Define stats parameters
 # General
-NAME = ""             # name of statistics
+NAME = "_default"             # name of statistics
 CREATED = now()       # date of creation
 SEED = 1234           # seed used    
 

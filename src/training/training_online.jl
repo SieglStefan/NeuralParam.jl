@@ -1,6 +1,6 @@
-### Trains a parameterization online in SpeedyWeather,jl
+### Trains a parameterization online in SpeedyWeather.jl
 ###
-### Algorithm:
+### XXX Algorithm:
 ###     
 ###     - Initialize containers, optimiser and training data saving
 ###     - Initialize target and training simulation:        sim_target and sim_train
@@ -31,18 +31,10 @@
 function training_online(;
     spectral_grid,
     lw_radiation_train,
-    lw_radiation_target,
     run_config,
     output_config,
     output_path,
-    test_mode,
 )
-
-    # Unpack run config parameters
-    (; eta_decay,
-    n_ic, n_traj, n_epochs, n_steps_0, n_steps_inc, n_gap,
-    ) = run_config
-
 
     # Set seed for reproducability
     Random.seed!(run_config.seed)
@@ -51,14 +43,16 @@ function training_online(;
     # Setup optimiser
     opt_state, eta = setup_optimiser(run_config, ps=lw_radiation_train.ps)
 
-
     # Setup simulations
     sim_template, sim_train, sim_target = setup_simulations(
         spectral_grid,
         run_config,
         lw_radiation_train,
-        lw_radiation_target,
     )
+
+
+    # Calculate grid weights for loss function
+    grid_weights = area_weights(sim_train.variables.grid.temperature)
 
 
     # Define containers for logging
@@ -69,9 +63,8 @@ function training_online(;
 
     # Initalize .csv file for logging
     if output_config.train_save
-        meta = build_meta(lw_radiation_train, lw_radiation_target, run_config)
         metric_keys = keys(compute_metrics(lw_radiation_train, sim_train.variables, sim_target.variables))
-        csv_init(meta, metric_keys; path=output_path, file=output_config.train_file)
+        csv_init(metric_keys; path=output_path, file=output_config.train_file)
     end
 
     # Initialize folder for training plots
@@ -85,34 +78,37 @@ function training_online(;
     @info "Online training started!"
     print_config(run_config, 2*sim_template.model.time_stepping.Δt_sec)
 
-    if test_mode
-        @warn "Test mode is activated! Enzyme.autodiff is NOT used!"
+    if ~run_config.do_autodiff
+        @warn "Autodiff is deactivated! Enzyme.autodiff is NOT used!"
     end
 
 
 
     # Loop over initial conditions
-    for ic in 1:n_ic
+    for ic in 1:run_config.n_ic
     
         # Update number of steps for calculating gradients
-        n_steps = n_steps_0 + (ic-1) * n_steps_inc
+        n_steps = run_config.n_steps_0 + (ic-1) * run_config.n_steps_inc
 
         # Draw a starting date
-        start_date = sample_start_date(ic, n_ic)
+        start_date = sample_start_date(ic, run_config.n_ic)
     
         # Prepare reference simulation 
         sim_ref = prepare_reference(sim_template, run_config, n_steps, start_date)
 
 
+        # Declare gradient sum and update flag for training step
+        grad_sum = nothing
+        do_update = false
+
+
 
         # Loop over trajectory segments
-        for traj in 1:n_traj
+        for traj in 1:run_config.n_traj
 
             # Copy reference variables
             vars0 = deepcopy(sim_ref.variables) 
 
-
-            ### Prepare target simulation
 
             # Set target variables to reference variables
             copy!(sim_target.variables, vars0)
@@ -123,12 +119,11 @@ function training_online(;
 
 
             # Reuse same trajectory segment for several updates
-            for epoch in 1:n_epochs
+            for epoch in 1:run_config.n_epochs
 
-                ### Prepare training simulation
-            
                 # Re-create training simulation with updated radiation
                 sim_train = @set sim_train.model.longwave_radiation = lw_radiation_train
+
 
                 # Set training variables to reference variables
                 copy!(sim_train.variables, vars0)
@@ -142,20 +137,36 @@ function training_online(;
                     @info "Start 1st training step!"
                 end
 
+                # Update flag for training step
+                if traj % run_config.n_batch == 0
+                    do_update = true
+                end
 
-                # Perform one training step
-                step = online_training_step(
-                    lw_radiation_train;
+
+                # Perform one online training step
+                step = online_training_step(;
+                    lw_radiation_train,
+                    do_update,
+                    grad_sum,
                     vars0,
                     sim_target,
                     sim_train,
                     n_steps,
                     opt_state,
-                    test_mode
+                    n_batch = run_config.n_batch,
+                    do_autodiff = run_config.do_autodiff,
+                    grid_weights
                 )            
-                
-                lw_radiation_train = step.lw_radiation
+
+
+                # Extract gradient sum and optimser state
+                grad_sum = step.grad_sum
                 opt_state = step.opt_state
+
+                # Update radiation scheme parameters after batch window
+                if do_update
+                    lw_radiation_train = step.lw_radiation
+                end
 
 
                 # Store loss, parameters, gradients, and norms
@@ -170,19 +181,13 @@ function training_online(;
                         L[end], eta, PN[end], GN[end], step.metrics;
                         path=output_path, file=output_config.train_file
                     )
-                end
-                    
-
-                # Print epoch update
-                if output_config.printing_epochs
-                    print_epochs(epoch, L[end], PN[end], GN[end])
-                end
+                end 
             end
 
 
             # Propagate reference trajectory forward
-            for _ in 1:(n_steps+n_gap)
-                SpeedyWeather.later_timestep!(sim_ref)
+            for _ in 1:(n_steps+run_config.n_gap)
+                SpeedyWeather.time_step!(sim_ref)
             end
             
             
@@ -193,8 +198,8 @@ function training_online(;
         end
 
 
-        # Update learning rate
-        eta *= eta_decay
+        # Update learning rate after every ic and update optimiser
+        eta *= run_config.eta_decay
         Optimisers.adjust!(opt_state, eta)
 
 
@@ -207,7 +212,7 @@ function training_online(;
         # Plot current loss trajectory after every ic
         if output_config.plots_save
             p = plot_training(L, PN, GN;
-                plot_kwargs=(;plot_title = "until IC nr. $(ic)"))
+                plot_kwargs=(;plot_title = "until IC nr. $(ic) / $(run_config.n_ic)"),)
 
             dir = joinpath(output_path, output_config.plots_folder)
             file = joinpath(dir, "IC_$(ic).png")
@@ -224,31 +229,48 @@ end
 
 
 # Function for performing one training step
-function online_training_step(
-    lw_radiation_train;
+function online_training_step(;
+    lw_radiation_train,
+    do_update,
+    grad_sum,
     vars0,
     sim_target,
     sim_train,
     n_steps,
     opt_state,
-    test_mode,
+    n_batch,
+    do_autodiff,
+    grid_weights,
 )
 
-    # Compute gradients 
+    # Compute gradients and rest
     grads, loss, metrics = compute_gradients(
         vars0, 
         sim_target, 
         sim_train, 
         n_steps, 
-        test_mode
+        do_autodiff,
+        grid_weights
     )
 
-    # Update parameters
-    opt_state, ps_new = Optimisers.update(opt_state, lw_radiation_train.ps, grads)
-    lw_radiation_new = update_ps(lw_radiation_train, ps_new)
+    # Accumulate gradients over batch window
+    grad_sum = isnothing(grad_sum) ? grads : tree_add(grad_sum, grads)
 
-    return (; lw_radiation=lw_radiation_new, loss, metrics, grads, opt_state)
+
+    # Calculate mean gradients when scheme update is due
+    if do_update
+
+        # Calculate mean
+        avg = tree_scale(grad_sum, 1f0/n_batch)
+
+        # Update optimiser and scheme
+        opt_state, ps_new = Optimisers.update(opt_state, lw_radiation_train.ps, avg)
+        lw_radiation_train = update_ps(lw_radiation_train, ps_new)
+
+        # Reset gradient sum
+        grad_sum = nothing
+    end
+
+
+    return (; lw_radiation=lw_radiation_train, grads, loss, metrics, opt_state, grad_sum)
 end
-
-
-

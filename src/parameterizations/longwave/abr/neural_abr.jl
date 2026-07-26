@@ -60,7 +60,7 @@ function NeuralABRLW(
 
     # Load zscore statistics
     if isnothing(zscore_folder)
-        folder = "zscore_abrlw_L$(nlayers)"
+        folder = "zscore_abrlw_L$(nlayers)_default"
     else
         folder = zscore_folder
     end
@@ -186,4 +186,11 @@ Base.@propagate_inbounds function SpeedyWeather.parameterization!(
 
     return nothing
 end
+
+
+
+
+
+# Define meta data for a NeuralABRLW parameterization
+info_scheme(s::NeuralABRLW) = (; scheme="NeuralABRLW", n_in=s.n_in, n_out=s.n_out, info_arch(s.arch_config)...)
 

@@ -1,50 +1,73 @@
-### XXX
+### Functions for calculating and seeding losses
 ###
 ### XXX
 
 
-function seed_loss!(bvars_ad, para::AbstractLinearLW, vars_train, vars_target)
-    
 
+# Function for seeding the loss function (MSE) for a LinearLW scheme
+function seed_loss!(bvars_ad, para::AbstractLinearLW, vars_train, vars_target, grid_weights)
+    
     # Extract final temperature fields
     T_train = vars_train.grid.temperature
     T_target = vars_target.grid.temperature
+    N_T = length(T_target)
 
-    bvars_ad.grid.temperature.= 2f0 .* (T_train .- T_target) ./length(T_target)
+    # Prepare grid area weights
+    W = reshape(grid_weights, :, 1)
 
-    return mse(T_train, T_target)
+    # Seed the temperature gradient container
+    bvars_ad.grid.temperature.= 2f0 .* W .* (T_train .- T_target) ./N_T
+
+    # Return L = MSE
+    return sum(W .* abs2.(T_train .- T_target)) /N_T
 end
 
 
-# XXX 
-function seed_loss!(bvars_ad, para::AbstractABRLW, vars_train, vars_target)
-
-    # Extract number of vertical layers
-    nlayers = para.n_out - 2
+# Function for seeding the loss function (MSE) for an ABRLW scheme
+function seed_loss!(bvars_ad, para::AbstractABRLW, vars_train, vars_target, grid_weights)
 
     # Extract final temperature fields
     T_train = vars_train.grid.temperature
     T_target = vars_target.grid.temperature
+    N_T = length(T_target)
+
 
     # Extract fluxes
     olw_train = vars_train.parameterizations.outgoing_longwave
     olw_target = vars_target.parameterizations.outgoing_longwave
+    N_olw = length(olw_target)
 
     slwd_train = vars_train.parameterizations.surface_longwave_down
     slwd_target = vars_target.parameterizations.surface_longwave_down
+    N_slwd = length(slwd_target)
 
 
-    T_std = reshape(para.zscore.input_std[1:nlayers], 1, :)  
-    bvars_ad.grid.temperature  .=                       2f0 .* (T_train .- T_target)         ./T_std.^2      ./length(T_target)
+    # Prepare grid area weights and extract number of vertical layers
+    W = reshape(grid_weights, :, 1)
+    nlayers = para.n_out - 2
 
-    olw_std = para.zscore.output_std[end-1]
-    bvars_ad.parameterizations.outgoing_longwave .=     2f0 .* (olw_train .- olw_target)     ./olw_std.^2    ./length(olw_target)
+    
+    # Extract temperature mean and seed scaled temperature gradient container
+    T_mean = reshape(para.zscore.input_mean[1:nlayers], 1, :)  
+    bvars_ad.grid.temperature  .=                       2f0 .* W .* (T_train .- T_target)         ./T_mean.^2      ./N_T
 
-    slwd_std = para.zscore.output_std[end]
-    bvars_ad.parameterizations.surface_longwave_down .= 2f0 .* (slwd_train .- slwd_target)   ./slwd_std.^2   ./length(slwd_target)
+    # Extract flux means and seed scaled flux gradient containers
+    olw_mean = para.zscore.output_mean[end-1]
+    bvars_ad.parameterizations.outgoing_longwave .=     2f0 .* W .* (olw_train .- olw_target)     ./olw_mean.^2    ./N_olw
 
-    return norm_mse(T_train, T_target, T_std) + norm_mse(olw_train, olw_target, olw_std) + norm_mse(slwd_train, slwd_target, slwd_std)
+    slwd_mean = para.zscore.output_mean[end]
+    bvars_ad.parameterizations.surface_longwave_down .= 2f0 .* W .* (slwd_train .- slwd_target)   ./slwd_mean.^2   ./N_slwd
+
+    # Return L
+    return  sum(W .* abs2.(T_train .- T_target) ./T_mean.^2 ./N_T) +
+            sum(W .* abs2.(olw_train .- olw_target) ./olw_mean.^2 ./N_olw) +
+            sum(W .* abs2.(slwd_train .- slwd_target) ./slwd_mean.^2 ./N_slwd) 
+
 end
+
+
+
+
 
 
 function compute_metrics(::AbstractABRLW, vars_train, vars_target)

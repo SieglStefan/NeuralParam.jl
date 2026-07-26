@@ -50,7 +50,7 @@ function NeuralLinearLW(
 
     # Load zscore statistics
     if isnothing(zscore_folder)
-        zs_folder = "zscore_llw_L$(nlayers)"
+        zs_folder = "zscore_llw_L$(nlayers)_default"
     else
         zs_folder = zscore_folder
     end
@@ -61,7 +61,7 @@ function NeuralLinearLW(
     # Load scaling statistics
     if standard_scaling == false
         if isnothing(scaling_folder)
-            sc_folder = "scaling_llw_L$(nlayers)"
+            sc_folder = "scaling_llw_L$(nlayers)_default"
         else
             sc_folder = scaling_folder
         end
@@ -147,3 +147,9 @@ Base.@propagate_inbounds function SpeedyWeather.parameterization!(
 
     return nothing
 end
+
+
+
+
+# Define meta data for a NeuralLinearLW parameterization
+info_scheme(s::NeuralLinearLW) = (; scheme="NeuralLinearLW", n_in=s.n_in, n_out=s.n_out, info_arch(s.arch_config)...)

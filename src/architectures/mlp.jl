@@ -42,3 +42,5 @@ function setup_arch(
     return nn, ps, st
 end
 
+# Define meta data for a MLP neural network architecture
+info_arch(c::MLPConfig) = (; n_hidden=c.n_hidden, width=c.width, act=string(c.act))

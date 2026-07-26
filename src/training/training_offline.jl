@@ -1,1 +1,3 @@
-### Only a placeholder file, not planned yet
+### Trains a parameterization online in SpeedyWeather.jl
+###
+### Not planned yet

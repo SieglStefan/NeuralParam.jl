@@ -51,16 +51,12 @@ end
 
 
 
-
-# Propagate a simulation for n_steps using a leapfrog timestep!()
+# Propagate a simulation for n_steps
 function sim_timesteps!(sim, n_steps)
 
-    # Extract time stepping
-    dt = 2 * sim.model.time_stepping.Δt
-
-    # Propagate the simulation for n_steps * dt
     for _ in 1:n_steps
-        SpeedyWeather.timestep!(sim.variables, dt, sim.model, 2, 2)
+        SpeedyWeather.time_step!(sim.variables, sim.model.time_stepping, sim.model)             # dynamics
+        SpeedyWeather.time_step!(sim.variables.prognostic.clock, sim.model.time_stepping)       # clock
     end
 
     return nothing
@@ -71,9 +67,8 @@ end
 # Function for sampling a trajectory of sim, starting with ic
 function sample_trajectory(sim, ic; n_steps, n_gap)
     
-    # Initialize sim, do a first step and set initial condition
+    # Initialize sim and copy initial conditions onto sim
     SpeedyWeather.initialize!(sim; steps = n_steps)
-    SpeedyWeather.first_timesteps!(sim)
     copy!(sim.variables, ic)
 
     # Create container for grid temperatures with a first entry
@@ -82,12 +77,13 @@ function sample_trajectory(sim, ic; n_steps, n_gap)
     # Loop over steps
     for step in 1:n_steps
 
-        # Do a later  timestep
-        SpeedyWeather.later_timestep!(sim)
+        # Do a single timestep
+        SpeedyWeather.time_step!(sim)
 
         # Store temperature after n_gaps
         step % n_gap == 0 && push!(data, copy(sim.variables.grid.temperature))
     end
 
+    # Return only grid temperature field
     return (; temperature = data)
 end

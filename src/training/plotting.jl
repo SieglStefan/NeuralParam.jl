@@ -29,11 +29,18 @@ function plot_training(
     loss::AbstractVector,
     pnorm::AbstractVector,
     gnorm::AbstractVector;
+    n_batch = 1,
     loss_kwargs = (;),
     pnorm_kwargs = (;),
     gnorm_kwargs = (;),
     plot_kwargs = (;),
 )
+
+
+    # Mean over consecutive blocks of n_batch steps, and their x-positions
+    bmean(v) = [Statistics.mean(@view v[i:min(i+n_batch-1, lastindex(v))]) for i in 1:n_batch:length(v)]
+    xb = [min(i+n_batch-1, length(loss)) for i in 1:n_batch:length(loss)]
+
 
     # Loss plot
     p1 = Plots.plot(
@@ -43,6 +50,7 @@ function plot_training(
         legend = false, 
         loss_kwargs...,
     )
+    Plots.plot!(p1, xb, bmean(loss); label = "batch mean", lw = 2, color = :red)
 
     # Parameter norm plot
     p2 = Plots.plot(
@@ -52,6 +60,7 @@ function plot_training(
         legend = false,  
         pnorm_kwargs...,
     )
+    Plots.plot!(p2, xb, bmean(pnorm); label = "batch mean", lw = 2, color = :red)
 
     # Gradient norm plot
     p3 = Plots.plot(
@@ -62,6 +71,7 @@ function plot_training(
         legend = false,  
         gnorm_kwargs...,
     )
+     Plots.plot!(p3, xb, bmean(gnorm); label = "batch mean", lw = 2, color = :red)
 
     defaults = (; size = (600, 900), left_margin = 8Plots.mm)
     merged = merge(defaults, plot_kwargs)
@@ -70,7 +80,7 @@ function plot_training(
 end
 
 # Plot timeseries of loss, parameter- and gradient norm of a training run from file
-function plot_training(; path="", file="", kwargs...)
+function plot_training(; path="", file="", n_batch, kwargs...)
     
     # Read and extract data
     df = csv_read(;path, file)
@@ -79,7 +89,7 @@ function plot_training(; path="", file="", kwargs...)
     pnorm = df.pnorm
     gnorm = df.gnorm
     
-    return plot_training(loss, pnorm, gnorm; kwargs...)
+    return plot_training(loss, pnorm, gnorm; n_batch, kwargs...)
 end
 
 

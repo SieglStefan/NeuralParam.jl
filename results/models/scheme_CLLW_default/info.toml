@@ -1,0 +1,27 @@
+amp_q = 0.20000000298023224
+amp_t = 2.0
+created = 2026-07-26T18:06:28.783Z
+eta0 = 0.0010000000474974513
+eta_decay = 0.8999999761581421
+final_loss = 0.07939416170120239
+julia = "1.10.11"
+lw_scheme = "OneBandLongwave"
+model = "PrimitiveWetModel"
+n_epochs = 2
+n_gap = 0
+n_ic = 1
+n_steps_0 = 5
+n_steps_inc = 2
+n_traj = 10
+name = "default"
+nlayers = 8
+seed = 1234
+start_date = "2000-01-01T00:00:00"
+sw = "0.20.1"
+t_spinup = "1 day"
+trunc = 31
+
+[scheme]
+init_a = [-1.0, -1.0, -1.0, -1.0, -1.0, -1.0, -1.0, -1.0]
+init_b = [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0]
+scheme = "ConstLinearLW"

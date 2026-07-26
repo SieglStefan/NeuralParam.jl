@@ -65,7 +65,7 @@ function NeuralABRLWGlobal(
 
     # Load zscore statistics
     if isnothing(zscore_folder)
-        folder = "zscore_abrlw_L$(nlayers)"
+        folder = "zscore_abrlw_L$(nlayers)_default"
     else
         folder = zscore_folder
     end
@@ -239,3 +239,9 @@ end
 
 # Define column parameterization to do nothing
 SpeedyWeather.parameterization!(ij, vars, scheme::NeuralABRLWGlobal, model) = nothing
+
+
+
+
+# Define meta data for a NeuralABRLWGlobal parameterization
+info_scheme(s::NeuralABRLWGlobal) = (; scheme="NeuralABRLWGlobal", n_in=s.n_in, n_out=s.n_out, n_points=s.n_points, info_arch(s.arch_config)...)

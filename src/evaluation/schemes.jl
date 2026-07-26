@@ -1,19 +1,18 @@
-### XXX
 
 
-# Load model from a calibration run folder
-load_model(run_path, task = 0) = load_scheme(
-    path = joinpath(run_path, "task_$(task)"), 
-    file = "scheme.jld2"
-)
 
-# Resolve spec: String -> load, otherwise pass on  (e.g. "nothing")
-#   String:             - path to run folder, loads task 0
-#   (path, task)        - loads specific task
-#   scheme/nothing      - pass it on unchanged
-resolve(spec::AbstractString) = load_model(spec)
-resolve(spec::Tuple)          = load_model(spec...)
-resolve(spec)                 = spec
 
-# Build schemes
-build_schemes(specs, dir) = (; (k => resolve(v, dir) for (k, v) in specs)...)
+
+
+
+
+# Collect saved objects from a results directory into a NamedTuple keyed by name
+function collect_objects(names, dir, file)
+    return (; (Symbol(n) => first(load(; path = joinpath(dir, n), file)) for n in names)...)
+end
+
+collect_schemes(names; dir = joinpath(@__DIR__, "..", "..", "results", "models"),
+                       file = "scheme.jld2") = collect_objects(names, dir, file)
+
+collect_rollouts(names; dir = joinpath(@__DIR__, "..", "..", "results", "rollouts"),
+                        file = "rollout.jld2") = collect_objects(names, dir, file)

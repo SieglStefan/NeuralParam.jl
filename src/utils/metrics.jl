@@ -1,6 +1,6 @@
 ### Metrics and norm utilities
 ###
-### Helper functions for evaluation data
+### XXX Helper functions for evaluation data
 
 
 
@@ -45,3 +45,15 @@ tree_l2sum(x::NamedTuple) = sum(tree_l2sum, values(x))
 
 # Recursive L2 norm for parameter/gradient trees
 tree_l2norm(x) = sqrt(tree_l2sum(x))
+
+
+
+tree_add(a::Number, b::Number)               = a + b
+tree_add(a::AbstractArray, b::AbstractArray)  = a .+ b
+tree_add(a::Tuple, b::Tuple)                  = map(tree_add, a, b)
+tree_add(a::NamedTuple, b::NamedTuple)        = map(tree_add, a, b)
+
+tree_scale(a::Number, s)        = a * s
+tree_scale(a::AbstractArray, s) = a .* s
+tree_scale(a::Tuple, s)         = map(x -> tree_scale(x, s), a)
+tree_scale(a::NamedTuple, s)    = map(x -> tree_scale(x, s), a)

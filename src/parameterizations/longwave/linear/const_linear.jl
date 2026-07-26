@@ -74,3 +74,8 @@ Base.@propagate_inbounds function SpeedyWeather.parameterization!(
 
     return nothing
 end
+
+
+
+# Define meta data for a ConstLinearLW parameterization
+info_scheme(s::ConstLinearLW) = (; scheme="ConstLinearLW", init_a=s.ps.a, init_b=s.ps.b)

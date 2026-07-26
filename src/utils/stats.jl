@@ -1,7 +1,7 @@
 ### Statistics utilities
 ###
 ### - Defining structs and helper functions for output scaling
-### - Defining structs and helper functions for zscore-statistics for input and output
+### XXX - Defining structs and helper functions for zscore-statistics for input and output
 
 
 
@@ -18,8 +18,8 @@ function Scaling(folder::String, arch = SpeedyWeather.CPU())
     data = load_stats(folder)
 
     return Scaling(
-        on_architecture(arch, Float32.(data["sc_a"])),
-        on_architecture(arch, Float32.(data["sc_b"])),
+        on_architecture(arch, Float32.(data.sc_a)),
+        on_architecture(arch, Float32.(data.sc_b)),
     )
 end
 
@@ -51,9 +51,15 @@ function ZScoreStats(folder::String, arch = SpeedyWeather.CPU())
     data = load_stats(folder)
 
     return ZScoreStats(
-        on_architecture(arch,   Float32.(data["input_mean"])),
-        on_architecture(arch,   Float32.(data["input_std"])),
-        on_architecture(arch,   Float32.(data["output_mean"])),
-        on_architecture(arch,   Float32.(data["output_std"])),
+        on_architecture(arch,   Float32.(data.input_mean)),
+        on_architecture(arch,   Float32.(data.input_std)),
+        on_architecture(arch,   Float32.(data.output_mean)),
+        on_architecture(arch,   Float32.(data.output_std)),
     )
 end
+
+
+
+
+load_stats(folder; file = "stats.jld2") =
+    load(; path = joinpath(@__DIR__, "..", "..", "data", "stats", folder), file)
