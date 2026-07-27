@@ -245,3 +245,16 @@ SpeedyWeather.parameterization!(ij, vars, scheme::NeuralABRLWGlobal, model) = no
 
 # Define meta data for a NeuralABRLWGlobal parameterization
 info_scheme(s::NeuralABRLWGlobal) = (; scheme="NeuralABRLWGlobal", n_in=s.n_in, n_out=s.n_out, n_points=s.n_points, info_arch(s.arch_config)...)
+
+
+# Define conversion for global ABRLW scheme
+function to_cpu(s::NeuralABRLWGlobal)
+    
+    return NeuralABRLWGlobal(
+        s.n_in, s.n_out, s.n_points,
+        s.arch_config,
+        to_cpu(s.zscore),
+        s.nn, cpu_device()(s.ps), cpu_device()(s.st),
+        s.def_co2, s.def_ocean_em, s.def_land_em,
+    )
+end

@@ -23,3 +23,7 @@ abstract type AbstractLinearLW <: AbstractNeuralLW end
 
 # Schemes emulating AnalyticBandRadiation.jl
 abstract type AbstractABRLW <: AbstractNeuralLW end
+
+
+# Define conversion of general LW schemes (everything is already on cpu=
+to_cpu(s::AbstractNeuralLW) = s

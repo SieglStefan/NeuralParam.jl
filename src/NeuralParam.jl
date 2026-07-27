@@ -30,65 +30,57 @@ using MLDataDevices: cpu_device, gpu_device
 using BenchmarkTools
 
 
+
 export  
         ### utils
         # data.jl
-                perturb_grid_field!,
-                sim_timesteps!,
-                sample_trajectory,
+                        #perturb_grid_field!,
+                        #sim_timesteps!,
+                        #sample_trajectory,
                 
-        # device.jl
-                        #to_cpu,
         # io.jl
-                save,
-                load,
-                        #load_stats,
-                        #csv_init,
-                        #csw_row!,
-                        #csv_read,
-                        #arch_meta,
-                        #meta_scheme,
-                        #build_meta,
+                        #reference_dir,
+                        #stats_dir,
+                        #model_dir,
+                        #rollout_dir,
+                collect_schemes,
+                collect_rollouts,
+                load_stats,
+                        #save,
+                        #load,
                         #_toml,
                 write_info,
                 prepare_out_dir,
-                        #fresh_out_dir,
+                fresh_out_dir,
         # metrics.jl
-                mse,
-                rmse,
-                bias,
-                correlation,
-                maxdiff,
-                tree_l2sum,
-                tree_l2norm,
+                        #mse,
+                        #rmse,
+                        #bias,
+                        #correlation,
+                        #maxdiff,
+                        #tree_l2sum,
+                        #tree_l2norm,
+                        #tree_add,
+                        #tree_scale,
         # plotting.jl
-                plot_loss,
-                plot_training,
-                plot_training_comp,
-                plot_metrics,
-                plot_comparison,
                         #field_to_lonlatmat,
                 plot_heatmap,
                 plot_heatmaps,
-                plot_heatmaps_eval,
                 plot_histograms,
-        # printing.jl
-                        #print_ic,
-                        #print_traj,
-                        #print_epochs,
-                print_config,    
         # stats.jl
                 Scaling,
-                zscore,
-                inv_zscore,
-                ZScoreStats,
+                        #to_cpu,
+                        #zscore,
+                        #inv_zscore,
+                ZScoreStats,     
         # utils.jl
                 extract_layer,
-                target_colorrange,
                 steps_from_days,
                 days_from_steps,
+                        #sample_start_date,
+                        #target_colorrange,
+                        #area_weights,
 
-#  XXX !!! ADAPT  training/plotting!
         ### architectures
         # abstract_arch.jl
                         #AbstractArchConfig,
@@ -100,59 +92,88 @@ export
                 # ---
 
         ### parameterizations
+        # abstract_longwave.jl
+                #AbstractNeuralLW,
+                #AbstractLinearLW,
+                #AbstractABRLW,
+                #to_cpu,
+        ## /linear       
         # const_linear.jl
                 ConstLinearLW,
                         #update_ps,
-                info_scheme,
+                        #info_scheme, 
         # neural_linear.jl
                 NeuralLinearLW,
-                        #update_ps,
+                        # (-//-)
+        ## /abr
         # neural_abr.jl
                 NeuralABRLW,
-                        #update_ps,
+                        # (-//-)
         # neural_abr_global.jl
                 NeuralABRLWGlobal,
-                        #update_ps,
-
+                        # (-//-)
 
         ### training
         # config.jl
                 RunConfig,
                 OutputConfig,
-        # loss.jl
-                compute_metrics,
-                        #seed_loss!,
         # gradients.jl
                         #compute_gradients,
                         #checkpointed_timesteps!,
+        # logging.jl
+                        #csv_init,
+                        #csv_row!,
+                        #csv_read,
+                        #print_ic,
+                        #print_traj,
+                print_config,
+        # loss.jl
+                        #compute_metrics,
+                        #seed_loss!,
+
+        # setup.jl
+                        #setup_simulations,
+                        #setup_optimiser,
+                        #prepare_reference,
+        # plotting.jl
+                plot_loss,
+                plot_training,
+                plot_training_comp,
+                plot_metrics,
         # run_training.jl
                 run_training,
-        # training_offline
+        # setup.jl
+                        #setup_simulations,
+                        #setup_optimiser,
+                        #prepare_reference,
+        # training_offline.jl
                 # ---
-        # training_online
+        # training_online.jl
                         #training_online,
                         #online_training_step,
 
 
         ### evaluation
         # rollout.jl
-                evaluate_rollout,
+                plot_rollout,
         # benchmark.jl
-                evaluate_benchmark
+                evaluate_benchmark,
+                print_benchmark
 
 
 
 
 
-# General utils (expect io, printing and device management)
+# General utils
 include("utils/utils.jl")
-include("utils/stats.jl")
 include("utils/metrics.jl")
-include("utils/plotting.jl")
 include("utils/data.jl")
+include("utils/io.jl")
+include("utils/plotting.jl")
+include("utils/stats.jl")
 
 
-# Models
+# Architectures
 include("architectures/abstract_arch.jl")
 include("architectures/mlp.jl")
 include("architectures/rnn.jl")
@@ -166,21 +187,16 @@ include("parameterizations/longwave/abr/neural_abr.jl")
 include("parameterizations/longwave/abr/neural_abr_global.jl")
 
 
-# IO, printing and device management
-include("utils/io.jl")
-include("utils/printing.jl")
-include("utils/device.jl")
-
-
 # Training infrastructure
+include("training/config.jl")
 include("training/loss.jl")
 include("training/gradients.jl")
 include("training/setup.jl")
-include("training/config.jl")
+include("training/plotting.jl")
+include("training/logging.jl")
 include("training/training_online.jl")
 include("training/training_offline.jl")
 include("training/run_training.jl")
-include("training/plotting.jl")
 
 
 # Evaluation infrastructure

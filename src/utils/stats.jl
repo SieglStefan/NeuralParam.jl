@@ -60,6 +60,23 @@ end
 
 
 
+# Define conversion for scaling
+function to_cpu(scaling::Scaling)
 
-load_stats(folder; file = "stats.jld2") =
-    load(; path = joinpath(@__DIR__, "..", "..", "data", "stats", folder), file)
+    return Scaling(
+        cpu_device()(scaling.sc_a),
+        cpu_device()(scaling.sc_b)
+    )
+end
+
+
+# Define conversion for zscore stats
+function to_cpu(z::ZScoreStats)
+
+    return ZScoreStats(
+        cpu_device()(z.input_mean),
+        cpu_device()(z.input_std),
+        cpu_device()(z.output_mean),
+        cpu_device()(z.output_std),
+    )
+end

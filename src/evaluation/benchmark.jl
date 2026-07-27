@@ -37,4 +37,8 @@ function evaluate_benchmark(schemes::NamedTuple; kwargs...)
 end
 
 
+function print_benchmark()
+    return nothing
+end
+
 

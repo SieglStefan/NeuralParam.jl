@@ -1,20 +1,6 @@
 ### Plotting utility functions
 ###
 ### XXX Plotting possibilities:
-### - plot_loss:        
-###         plots loss of a training run
-### - plot_training:    
-###         plots not only loss, but also parameter and gradient norm
-### - plot_training_comp:
-###         plots a loss comparison for several training runs
-### - plot_comparison:
-###         plots a compairson between two fields in respect to a given metric
-### - plot_heatmap:
-###         plots a single heatmap
-### - plot_heatmaps:
-###         plots 3 heatmaps with a shared colorbar
-### - plot_histograms
-###         plots histograms of fields for zscore validation
 
 
 
