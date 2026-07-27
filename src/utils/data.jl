@@ -15,6 +15,7 @@ function perturb_grid_field!(
     rng = Random.default_rng()
 )
     
+    # Check if grid has variable var
     if !hasfield(typeof(sim.variables.grid), var)
         @warn "Field $var does not exist in used model — perturbation skipped!." maxlog=1
         return nothing
@@ -67,16 +68,29 @@ end
 
 
 
-# Function for sampling a trajectory of sim, starting with ic
-function sample_trajectory(sim, ic; n_steps, n_gap)
-    
-    # Initialize sim, do a first step and set initial condition
-    SpeedyWeather.initialize!(sim; steps = n_steps)
-    SpeedyWeather.first_timesteps!(sim)
-    copy!(sim.variables, ic)
+# Function for sampling a trajectory of sim, starting with initial_condition
+function sample_grid_trajectory(
+    sim,
+    vars, 
+    initial_condition; 
+    n_steps, n_gap
+)
 
-    # Create container for grid temperatures with a first entry
-    data = [copy(sim.variables.grid.temperature)]
+    # Check if grid has variables vars
+    for v in vars
+        if !hasfield(typeof(sim.variables.grid), v)
+            @warn "Field $v does not exist in used model - trajectory sampling aborted!" maxlog=1
+            return nothing
+        end
+    end
+
+    # Initialize sim, do a first step and set initial condition
+    SpeedyWeather.initialize!(sim; steps = n_steps+1)
+    SpeedyWeather.first_timesteps!(sim)
+    copy!(sim.variables, initial_condition)
+
+    # Create container for grid fields with a first entry
+    data = (; (v => [copy(getfield(sim.variables.grid, v))] for v in vars)...)
 
     # Loop over steps
     for step in 1:n_steps
@@ -85,9 +99,17 @@ function sample_trajectory(sim, ic; n_steps, n_gap)
         SpeedyWeather.later_timestep!(sim)
 
         # Store temperature after n_gaps
-        step % n_gap == 0 && push!(data, copy(sim.variables.grid.temperature))
+        
+        if step % n_gap == 0
+            for v in vars
+                push!(data[v], copy(getfield(sim.variables.grid, v)))
+            end
+        end
     end
 
-    # Return only grid temperature field
-    return (; temperature = data)
+    return data
 end
+
+
+sample_grid_trajectory(sim, var::Symbol, initial_condition; n_steps, n_gap) = 
+    sample_grid_trajectory(sim, (var,), initial_condition; n_steps=n_steps, n_gap=n_gap)

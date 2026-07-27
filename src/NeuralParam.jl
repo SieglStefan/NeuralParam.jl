@@ -34,18 +34,21 @@ using BenchmarkTools
 export  
         ### utils
         # data.jl
-                        #perturb_grid_field!,
-                        #sim_timesteps!,
-                        #sample_trajectory,
+                perturb_grid_field!,
+                sim_timesteps!,
+                sample_grid_trajectory,
                 
         # io.jl
-                        #reference_dir,
-                        #stats_dir,
-                        #model_dir,
-                        #rollout_dir,
+                ROOT,
+                reference_dir,
+                stats_dir,
+                scheme_dir,
+                rollout_dir,
                 collect_schemes,
                 collect_rollouts,
                 load_stats,
+                resolve_scheme,
+                scheme_name,
                         #save,
                         #load,
                         #_toml,
@@ -54,8 +57,8 @@ export
                 fresh_out_dir,
         # metrics.jl
                         #mse,
-                        #rmse,
-                        #bias,
+                rmse,
+                bias,
                         #correlation,
                         #maxdiff,
                         #tree_l2sum,
@@ -70,8 +73,8 @@ export
         # stats.jl
                 Scaling,
                         #to_cpu,
-                        #zscore,
-                        #inv_zscore,
+                zscore,
+                inv_zscore,
                 ZScoreStats,     
         # utils.jl
                 extract_layer,

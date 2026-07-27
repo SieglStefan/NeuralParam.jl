@@ -9,35 +9,21 @@
 
 
 
-### Load packages
+# Load packages
 using Revise
 using NeuralParam
 using JLD2
 using CairoMakie
 
 
+# Define parameters for storing and loading
+NAME = "default"            # name of scaling
+SCHEME = "CLLW_default"     # name of the calibrated scheme
 
 
-# Choose calibrated model and define number of vertical layers
-NAME = "_default"             # name of the scaling stats file
-scheme_run = "run_T31_L8_2026-07-07_23-22-44"
-PARAM_NAME = "scheme.jld2"       # name of the parameterization file
-NLAYERS = 8           # number of vertical layers
+# Load ConstLinearLW parameterization
+scheme = NeuralParam.load(; path=scheme_dir(SCHEME), file="scheme.jld2")
 
-
-# Folder for stats files (.jld2, .png)
-foldername = "scaling_llw_L$(NLAYERS)$(NAME)"
-folderpath = joinpath(@__DIR__, "..", "..", "data", "stats", foldername)
-mkpath(folderpath)
-
-
-
-### Load ConstLinearLW parameterization
-# Create parameterization filepath
-path = joinpath(@__DIR__, "..", "..", "results", "1_ConstLinearLW", "calibration", scheme_run)
-
-# Load parameterization
-scheme = NeuralParam.load_scheme(; path, file=PARAM_NAME)
 
 # Extract parameter and calculate scaling
 sc_a = abs.(scheme.ps.a .* scheme.scaling.sc_a) 
@@ -45,18 +31,20 @@ sc_b = abs.(scheme.ps.b .* scheme.scaling.sc_b)
 
 
 
-
 ### Store statistics
-file = "stats.jld2"
-filepath = joinpath(folderpath, file)
+# Create folder
+foldername = "scaling_llw_$(NAME)"
+folderpath = prepare_out_dir(stats_dir(), foldername)
 
-JLD2.jldsave(filepath; sc_a, sc_b)
+# Save reference
+NeuralParam.save((sc_a=sc_a, sc_b=sc_b); path=folderpath, file="stats.jld2")
+@info "Reference dataset stored at $(folderpath)!"
 
 
 
 ### Plot loaded scaling parameters
+NLAYERS = size(sc_a, 1)
 layers = 1:NLAYERS
-
 fig = Figure()
 
 # Parameter a

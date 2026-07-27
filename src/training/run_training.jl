@@ -40,6 +40,7 @@ function run_training(
     # Save scheme after training
     if output_config.scheme_save
         save(param; path=output_path, file=output_config.scheme_file)
+        @info "Scheme $(output_config.scheme_file) stored at $(output_path)!"
     end
 
     return param, L, PN, GN

@@ -1,10 +1,11 @@
 ### Script for generating reference data for evaluation/testing
 ###
-### Objective: Propagate a specific model and save state every day for 2 years
+### Objective: Propagate a specific model and save whole state every day for 2 years
 
 
 
 ### Load packages
+using Revise
 using NeuralParam
 using SpeedyWeather
 using AnalyticBandRadiation
@@ -25,14 +26,14 @@ SG = SpectralGrid(trunc=TRUNC, nlayers=NLAYERS)
 ### Define possible variants for reference data generation
 variants = [
 
-    # Default: no longwave radiation scheme
+    # 0. Default: no longwave radiation scheme
     (;),
 
-    # OneBandLongwave default
-    (; name="OneBandLongwave_default", lw_scheme=OneBandLongwave(SG; transmissivity = FriersonLongwaveTransmissivity(SG))),
+    # 1. OneBandLongwave default
+    (; name="OBLW_default", lw_scheme=OneBandLongwave(SG; transmissivity = FriersonLongwaveTransmissivity(SG))),
 
-    # AnalyticBandRadiation default
-    (; name="AnalyticBandRadiation_default", lw_scheme=SpeedyExt.SpeedyAnalyticBandLongwave(SG)),
+    # 2. AnalyticBandRadiation default
+    (; name="ABR_default", lw_scheme=SpeedyExt.SpeedyAnalyticBandLongwave(SG)),
 ]
 
 # Get task number and choose task
@@ -43,21 +44,21 @@ v = variants[task+1]
 
 ### Define and extract parameters
 # General
-NAME =       get(v, :name, "default")
-SEED =       get(v, :seed, 42)
+NAME       = get(v, :name, "default")           # name of the reference data
+SEED       = get(v, :seed, 42)                  # used seed
 
 # Model and scheme
-MODEL =      get(v, :model, PrimitiveWetModel)
-LW_SCHEME =  get(v, :lw_scheme, nothing)
+MODEL      = get(v, :model, PrimitiveWetModel)  # used model
+LW_SCHEME  = get(v, :lw_scheme, nothing)        # used longwave radiation scheme
 
 # Sampling
-T_SPINUP   = get(v, :t_spinup, Day(31))
-START_DATE = get(v, :start_date, DateTime(2000, 1, 1))    
-SIM_DAYS   = get(v, :sim_days, 30)
+T_SPINUP   = get(v, :t_spinup, Day(1))                  # spinup time in days
+START_DATE = get(v, :start_date, DateTime(2000, 1, 1))  # sampling starting date
+SIM_DAYS   = get(v, :sim_days, 30)                      # sampling time in days
 
 # Perturbation
-FAC_PERT_T = get(v, :fac_pert_t, 2f0)
-FAC_PERT_Q = get(v, :fac_pert_q, 0.2f0)
+FAC_PERT_T = get(v, :fac_pert_t, 2f0)           # additive perturbation amplitude for temperature
+FAC_PERT_Q = get(v, :fac_pert_q, 0.2f0)         # multiplicative perturbation amplitude for humidity (zeromin = true)
 
 
 
@@ -85,7 +86,7 @@ run!(sim, period = T_SPINUP)
 (; Δt_sec) = sim.model.time_stepping
 steps_per_day = steps_from_days(1, Δt_sec)
 
-
+# Initialize simulation and perform a first timestep
 SpeedyWeather.initialize!(sim, steps = SIM_DAYS * steps_per_day + 1)
 SpeedyWeather.first_timesteps!(sim)
 
@@ -93,7 +94,7 @@ SpeedyWeather.first_timesteps!(sim)
 
 ### Start data sampling
 # Create container for variable states with a first entry
-states = [deepcopy(sim.variables)]
+reference = [deepcopy(sim.variables)]
 
 
 # Loop over the whole simulation
@@ -104,19 +105,20 @@ for day in 1:SIM_DAYS
         SpeedyWeather.later_timestep!(sim)
     end
 
-    push!(states, deepcopy(sim.variables))
+    # Save state
+    push!(reference, deepcopy(sim.variables))
 end
 
 
 
 ### Save reference data
 # Create folder
-base       = joinpath(@__DIR__, "..", "..", "data", "reference")
-foldername = "data_L$(NLAYERS)_T$(TRUNC)_$(MODEL)_$(NAME)"
-folderpath = prepare_out_dir(base, foldername)
+foldername = "$(NAME)"
+folderpath = prepare_out_dir(reference_dir(), foldername)
 
 # Save reference
-save(states; path = folderpath, file = "reference.jld2")
+NeuralParam.save(reference; path=folderpath, file="reference.jld2")
+@info "Reference dataset stored at $(folderpath)!"
 
 # Create and store info.toml file
 write_info(; 
@@ -132,13 +134,13 @@ write_info(;
     trunc           = TRUNC,
     nlayers         = NLAYERS,
 
-    model      = nameof(MODEL),
+    model           = nameof(MODEL),
     lw_scheme       = nameof(typeof(LW_SCHEME)),
     
     t_spinup        = string(T_SPINUP),
     start_date      = string(START_DATE),
     sim_days        = SIM_DAYS,
 
-    amp_t           = FAC_PERT_T,
-    amp_q           = FAC_PERT_Q,
+    fac_pert_t      = FAC_PERT_T,
+    fac_pert_q      = FAC_PERT_Q,
 )

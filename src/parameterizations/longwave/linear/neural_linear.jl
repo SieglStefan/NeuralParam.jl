@@ -50,7 +50,7 @@ function NeuralLinearLW(
 
     # Load zscore statistics
     if isnothing(zscore_folder)
-        zs_folder = "zscore_llw_L$(nlayers)_default"
+        zs_folder = "zscore_llw_default"
     else
         zs_folder = zscore_folder
     end
@@ -61,7 +61,7 @@ function NeuralLinearLW(
     # Load scaling statistics
     if standard_scaling == false
         if isnothing(scaling_folder)
-            sc_folder = "scaling_llw_L$(nlayers)_default"
+            sc_folder = "scaling_llw_default"
         else
             sc_folder = scaling_folder
         end

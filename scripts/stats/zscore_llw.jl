@@ -19,7 +19,6 @@ using Revise
 using NeuralParam
 using SpeedyWeather
 using Statistics, Random, Dates
-using JLD2
 using CairoMakie
 
 
@@ -33,29 +32,23 @@ SG = SpectralGrid(trunc=TRUNC, nlayers=NLAYERS)
 
 ### Define parameters for sampling
 # General
-NAME = "_default"             # name of statistics
-SEED = 21             # seed used    
+NAME        = "default"             # name of zscore
+SEED        = 21                    # seed used    
 
 # Model and scheme
-MODEL = PrimitiveWetModel
-LW_SCHEME = OneBandLongwave(SG; transmissivity = FriersonLongwaveTransmissivity(SG))
+MODEL       = PrimitiveWetModel                                                                 # used model
+LW_SCHEME   = OneBandLongwave(SG; transmissivity = FriersonLongwaveTransmissivity(SG))          # used LW scheme
 
 # Sampling
-T_SPINUP = 30         # spinup time in days
-START_DATE = Date(2000, 1, 1)   # start date of simulation
-N_IC = 1              # number of initial conditions
-SIM_TIME = 365        # sampling time in days
-SAMPLE_GAP = 3.65     # days between sampling
+T_SPINUP    = 30                    # spinup time in days
+START_DATE  = Date(2000, 1, 1)      # start date of simulation
+N_IC        = 1                     # number of initial conditions
+SIM_TIME    = 365                   # sampling time in days
+SAMPLE_GAP  = 3.65                  # days between sampling
 
 # Perturbation
-FAC_PERT_T = 2f0           # temperature perturbation amplitude
-FAC_PERT_Q = 0.2f0         # humidity perturbation amplitude (multiplicative)
-
-
-# XXX SHIFT IT TO LATER Folder for stats files (.jld2, .png and .toml)
-foldername = "zscore_llw_L$(NLAYERS)$(NAME)"
-base = joinpath(@__DIR__, "..", "..", "data", "stats")
-folderpath = prepare_out_dir(base, foldername)
+FAC_PERT_T  = 2f0                   # temperature perturbation amplitude
+FAC_PERT_Q  = 0.2f0                 # humidity perturbation amplitude (multiplicative)
 
 
 
@@ -67,25 +60,25 @@ Random.seed!(SEED)
 model = MODEL(SG; longwave_radiation = LW_SCHEME)
 sim_temp = initialize!(model)
 
+# Set starting time for spinup
+clock_start = START_DATE - T_SPINUP
+SpeedyWeather.set!(sim_temp.variables.prognostic.clock; time = clock_start, start = clock_start)
+
 # Extract timestepping
 (; Δt_sec) = model.time_stepping
 
 
 # Calulate number of timesteps for sampling
-n_steps_total = round(Int, SIM_TIME *3600 *24 / Δt_sec)
-n_gap = round(Int, SAMPLE_GAP *3600 *24 / Δt_sec)
+n_steps_total = round(Int, SIM_TIME *3600 *24 /Δt_sec)
+n_gap = round(Int, SAMPLE_GAP *3600 *24 /Δt_sec)
+
+# Print information
+@info "Total number of global samples per IC: ", n_steps_total ÷ n_gap
+@info "Time between samples (days): ", n_gap * Δt_sec /3600 /24
 
 
 # Declare temperature field container
 T_layers = [Float32[] for _ in 1:NLAYERS]
-
-
-
-# Print information
-println("--------------------------------------------------------------------")
-println("Total number of global samples per IC: ", n_steps_total ÷ n_gap)
-println("Time between samples (days): ", n_gap * Δt_sec /3600 /24)
-println("--------------------------------------------------------------------")
 
 
 
@@ -95,16 +88,19 @@ for i in 1:N_IC
     # Create simulation
     sim = deepcopy(sim_temp)
     
-    # Perturbate temperature field
+    # Perturbate temperature and humidity fields
     perturb_grid_field!(sim, :temperature; fac_add=FAC_PERT_T)
+    perturb_grid_field!(sim, :humidity; fac_mult=FAC_PERT_Q, zeromin=true)
 
 
     # Plot heatmap if first ic for visualization of perturbation before spinup
     titles = ["TOA", "Between", "Surface"]
     if i == 1
         temp_vec = [sim.variables.grid.temperature[:,k] for k in [1, Int(NLAYERS/2), NLAYERS]]
+        hum_vec = [log10.(sim.variables.grid.humidity[:,k] .+ 1f-9) for k in [1, Int(NLAYERS/2), NLAYERS]]
         
         display(plot_heatmaps(temp_vec; titles, suptitle = "Temperature before Spinup", coastlines=false))
+        display(plot_heatmaps(hum_vec; titles, suptitle = "Humidity before Spinup", coastlines=false))
     end
 
 
@@ -116,8 +112,10 @@ for i in 1:N_IC
     titles = ["TOA", "Between", "Surface"]
     if i == 1
         temp_vec = [sim.variables.grid.temperature[:,k] for k in [1, Int(NLAYERS/2), NLAYERS]]
-
+        hum_vec = [log10.(sim.variables.grid.humidity[:,k] .+ 1f-9) for k in [1, Int(NLAYERS/2), NLAYERS]]
+        
         display(plot_heatmaps(temp_vec; titles, suptitle = "Temperature after Spinup", coastlines=false))
+        display(plot_heatmaps(hum_vec; titles, suptitle = "Humidity after Spinup", coastlines=false))
     end
 
 
@@ -161,12 +159,16 @@ output_std = 0f0
 
 
 ### Store statistics
-file = "stats.jld2"
-filepath = joinpath(folderpath, file)
+# Create folder
+foldername = "zscore_llw_$(NAME)"
+folderpath = prepare_out_dir(stats_dir(), foldername)
 
-stats = (; input_mean, input_std, output_mean, output_std)
-save(stats; path=folderpath, file=file)
-
+# Save stats
+NeuralParam.save(
+    (input_mean=input_mean, input_std=input_std, output_mean=output_mean, output_std=output_std); 
+    path=folderpath, file="stats.jld2"
+)
+@info "Statistics $(foldername) stored at $(folderpath)!"
 
 # Create and store info.toml file
 write_info(;
@@ -194,8 +196,8 @@ write_info(;
     n_stats =       n_steps_total ÷ n_gap,
     gap_real =      n_gap * Δt_sec /3600 /24,
 
-    amp_t           = FAC_PERT_T,
-    amp_q           = FAC_PERT_Q,
+    fac_pert_t        = FAC_PERT_T,
+    fac_pert_q           = FAC_PERT_Q,
 
     inputs =        ["temperature"],
     outputs =       ["none: scaled via ConstLinearLW parameters"],
@@ -205,7 +207,6 @@ write_info(;
 
 ### Plot results
 layers = 1:NLAYERS
-
 fig = Figure()
 
 ax = Axis(
@@ -227,7 +228,6 @@ errorbars!(ax, T_mean, layers, T_std; direction = :x)
 # Display plot
 display(fig)
 
-# Store plot
 # Store plot
 file = "temp_vertical_profile.png"
 filepath = joinpath(folderpath, file)

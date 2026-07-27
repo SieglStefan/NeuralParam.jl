@@ -11,15 +11,22 @@
 
 const ROOT = normpath(joinpath(@__DIR__, "..", ".."))
 
-reference_dir(name) = joinpath(ROOT, "data", "reference", name)
-stats_dir(name)     = joinpath(ROOT, "data", "stats", name)
-model_dir(name)     = joinpath(ROOT, "results", "models", name)
-rollout_dir(name)   = joinpath(ROOT, "results", "rollouts", name)
+reference_dir(parts...) = joinpath(ROOT, "data", "reference", parts...)
+stats_dir(parts...)     = joinpath(ROOT, "data", "stats", parts...)
+scheme_dir(parts...)     = joinpath(ROOT, "results", "schemes", parts...)
+rollout_dir(parts...)   = joinpath(ROOT, "results", "rollouts", parts...)
 
-collect_schemes(names)  = (; (Symbol(n) => load(; path=model_dir(n),   file="scheme.jld2")  for n in names)...)
+collect_schemes(names)  = (; (Symbol(n) => load(; path=scheme_dir(n),   file="scheme.jld2")  for n in names)...)
 collect_rollouts(names) = (; (Symbol(n) => load(; path=rollout_dir(n), file="rollout.jld2") for n in names)...)
 load_stats(name)        = load(; path=stats_dir(name), file="stats.jld2")
 
+
+resolve_scheme(name::String) = load(; path=scheme_dir(name), file="scheme.jld2")
+resolve_scheme(scheme) = scheme
+
+scheme_name(name::AbstractString) = name
+scheme_name(::Nothing)            = "none"
+scheme_name(scheme)               = string(nameof(typeof(scheme)))
 
 
 
@@ -78,6 +85,7 @@ end
 function prepare_out_dir(folderpath, folder_name)
     out_dir = joinpath(folderpath, folder_name)
 
+    # Check if folder already exists and throw error
     if isdir(out_dir)
         error("Folder already exists ($out_dir): Task canceled! (not overwritten).")
     end
@@ -89,6 +97,7 @@ end
 function fresh_out_dir(folderpath, folder_name)
     out_dir = joinpath(folderpath, folder_name)
 
+    # Check if folder already exists and delete it
     if  isdir(out_dir)
         rm(out_dir; recursive = true) 
     end
