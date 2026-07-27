@@ -19,10 +19,12 @@ function setup_simulations(
     model_target = run_config.model(spectral_grid; longwave_radiation = run_config.lw_scheme)
     sim_target   = initialize!(model_target)
     SpeedyWeather.initialize!(sim_target, steps=0)
+    SpeedyWeather.first_timesteps!(sim_target)
 
     model_train  = run_config.model(spectral_grid; longwave_radiation = lw_radiation_train)
     sim_train    = initialize!(model_train)
     SpeedyWeather.initialize!(sim_train, steps=0)
+    SpeedyWeather.first_timesteps!(sim_train)
 
     return sim_template, sim_train, sim_target
 end
@@ -71,7 +73,8 @@ function prepare_reference(sim_template, run_config, n_steps, start_date)
     sim_ref = deepcopy(sim_pert)
 
     # Initialize reference trajectory and do a first step
-    SpeedyWeather.initialize!(sim_ref, steps = run_config.n_traj * (run_config.n_gap + n_steps))
+    SpeedyWeather.initialize!(sim_ref, steps = run_config.n_traj * (run_config.n_gap + n_steps) + 1)
+    SpeedyWeather.first_timesteps!(sim_ref)
 
     return sim_ref
 end

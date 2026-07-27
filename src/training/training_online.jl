@@ -187,7 +187,7 @@ function training_online(;
 
             # Propagate reference trajectory forward
             for _ in 1:(n_steps+run_config.n_gap)
-                SpeedyWeather.time_step!(sim_ref)
+                SpeedyWeather.later_timestep!(sim_ref)
             end
             
             

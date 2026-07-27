@@ -16,9 +16,9 @@ stats_dir(name)     = joinpath(ROOT, "data", "stats", name)
 model_dir(name)     = joinpath(ROOT, "results", "models", name)
 rollout_dir(name)   = joinpath(ROOT, "results", "rollouts", name)
 
-collect_schemes(names)  = (; (Symbol(n) => first(load(; path=model_dir(n),   file="scheme.jld2"))  for n in names)...)
-collect_rollouts(names) = (; (Symbol(n) => first(load(; path=rollout_dir(n), file="rollout.jld2")) for n in names)...)
-load_stats(name)        = first(load(; path=stats_dir(name), file="stats.jld2"))
+collect_schemes(names)  = (; (Symbol(n) => load(; path=model_dir(n),   file="scheme.jld2")  for n in names)...)
+collect_rollouts(names) = (; (Symbol(n) => load(; path=rollout_dir(n), file="rollout.jld2") for n in names)...)
+load_stats(name)        = load(; path=stats_dir(name), file="stats.jld2")
 
 
 

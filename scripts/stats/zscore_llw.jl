@@ -123,13 +123,14 @@ for i in 1:N_IC
 
     # Initialize simulation and do a first step
     initialize!(sim; steps=n_steps_total)
+    SpeedyWeather.first_timesteps!(sim)
 
 
     # Propagate the simulation and sample temperature fields
     for step in 1:n_steps_total
 
         # Do a timestep
-        SpeedyWeather.time_step!(sim)
+        SpeedyWeather.later_timestep!(sim)
 
         # Store input temperatures after n_gap steps
         if step % n_gap == 0

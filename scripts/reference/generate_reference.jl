@@ -86,7 +86,8 @@ run!(sim, period = T_SPINUP)
 steps_per_day = steps_from_days(1, Δt_sec)
 
 
-SpeedyWeather.initialize!(sim, steps = SIM_DAYS * steps_per_day)
+SpeedyWeather.initialize!(sim, steps = SIM_DAYS * steps_per_day + 1)
+SpeedyWeather.first_timesteps!(sim)
 
 
 
@@ -100,7 +101,7 @@ for day in 1:SIM_DAYS
 
     # Propagate simulation for one day
     for _ in 1:steps_per_day
-        SpeedyWeather.time_step!(sim)
+        SpeedyWeather.later_timestep!(sim)
     end
 
     push!(states, deepcopy(sim.variables))

@@ -101,7 +101,7 @@ export
         # const_linear.jl
                 ConstLinearLW,
                         #update_ps,
-                        #info_scheme, 
+                info_scheme, 
         # neural_linear.jl
                 NeuralLinearLW,
                         # (-//-)

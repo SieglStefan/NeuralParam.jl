@@ -16,7 +16,8 @@ function evaluate_benchmark(
     sim = initialize!(model_type(spectral_grid; longwave_radiation = scheme))
     
     # Initialize steps and do a first timestep
-    SpeedyWeather.initialize!(sim, steps = n_steps)
+    SpeedyWeather.initialize!(sim, steps = n_steps+1)
+    SpeedyWeather.first_timesteps!(sim)
 
 
     # Benchmark

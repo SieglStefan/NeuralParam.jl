@@ -78,12 +78,19 @@ function checkpointed_timesteps!(
     model_ad,
     n_steps,
     checkpoint_scheme::Scheme,
+    lf1 = 2,
+    lf2 = 2,
 )
 
     # Perform n_steps of timestep! with checkpointing for reverse-mode AD
     @ad_checkpoint checkpoint_scheme for _ in 1:n_steps
-        SpeedyWeather.time_step!(vars_ad, model_ad.time_stepping, model_ad)             # propagate dynamics
-        SpeedyWeather.time_step!(vars_ad.prognostic.clock, model_ad.time_stepping)      # propagate clock
+        SpeedyWeather.timestep!(
+            vars_ad,
+            2 * model_ad.time_stepping.Δt,
+            model_ad,
+            lf1,
+            lf2,
+        )
     end
 
     return nothing
