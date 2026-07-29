@@ -1,6 +1,7 @@
 # Local scratch / experiments, not part of the repo
 sandbox/
 .claude
+results_OLD
 
 # Reference data is 10+ GB - synced via rsync, not git
 data/reference/*
