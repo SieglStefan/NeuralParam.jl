@@ -1,8 +1,9 @@
 # Local scratch / experiments, not part of the repo
+.claude/
+results_OLD/
 sandbox/
-.claude
-results_OLD
+slurm_logs/
 
 # Reference data is 10+ GB - synced via rsync, not git
 data/reference/*
-!data/reference/.gitkeep
+!data/reference/info.toml
