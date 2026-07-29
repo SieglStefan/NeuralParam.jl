@@ -23,15 +23,15 @@ SG = SpectralGrid(trunc=TRUNC, nlayers=NLAYERS)
 variants = [ 
     
     # Default: uses default parameters for calibration
-    (;),                                                                                # 0
+    (;),                                                                                                         # 0
     
     # initialValue: uses different initial a and b for testing convergence of calibration scheme
-    (; name = "iV1", a = fill(-0.1f0,     NLAYERS), b = fill(0.1f0,    NLAYERS)),       # 1
-    (; name = "iV2", a = fill(-0.1f0,     NLAYERS), b = fill(10f0,     NLAYERS)),       # 2 
-    (; name = "iV3", a = fill(-10f0,      NLAYERS), b = fill(0.1f0,    NLAYERS)),       # 3          
-    (; name = "iV4", a = fill(-10f0,      NLAYERS), b = fill(10f0,     NLAYERS)),       # 4       
-    (; name = "iV5", a = fill(-0.0001f0,  NLAYERS), b = fill(1f0,      NLAYERS)),       # 5                   
-    (; name = "iV6", a = fill(-1f0,       NLAYERS), b = fill(0.0001f0, NLAYERS)),       # 6
+    (; name = "iV1", a = fill(-0.1f0,     NLAYERS), b = fill(0.1f0,    NLAYERS), eta0 = 1f0, n_traj = 40),       # 1
+    (; name = "iV2", a = fill(-0.1f0,     NLAYERS), b = fill(10f0,     NLAYERS), eta0 = 1f0, n_traj = 40),       # 2 
+    (; name = "iV3", a = fill(-10f0,      NLAYERS), b = fill(0.1f0,    NLAYERS), eta0 = 1f0, n_traj = 40),       # 3          
+    (; name = "iV4", a = fill(-10f0,      NLAYERS), b = fill(10f0,     NLAYERS), eta0 = 1f0, n_traj = 40),       # 4       
+    (; name = "iV5", a = fill(-0.0001f0,  NLAYERS), b = fill(1f0,      NLAYERS), eta0 = 1f0, n_traj = 40),       # 5                   
+    (; name = "iV6", a = fill(-1f0,       NLAYERS), b = fill(0.0001f0, NLAYERS), eta0 = 1f0, n_traj = 40),       # 6
     
     # dry: uses a PrimitiveDryModel instead of a PrimitiveWetModel
     (; name = "dry", model = PrimitiveDryModel, lw_scheme = OneBandLongwave(SG; transmissivity = ConstantLongwaveTransmissivity(SG))),          # 7
