@@ -1,3 +1,7 @@
 # Local scratch / experiments, not part of the repo
 sandbox/
 .claude
+
+# Reference data is 10+ GB - synced via rsync, not git
+data/reference/*
+!data/reference/.gitkeep
