@@ -130,7 +130,7 @@ reference = NeuralParam.load(; path=reference_dir(REFERENCE), file="reference.jl
 
 ### Compute and save reduced diagnostics
 # Extract time stepping
-Δt_sec = initialize!(model_type(SG; longwave_radiation = scheme)).model.time_stepping.Δt_sec
+Δt_sec = initialize!(MODEL(SG; longwave_radiation = scheme)).model.time_stepping.Δt_sec
 
 # Calculate number of steps for one day
 n_steps_day = steps_from_days(1, Δt_sec)
@@ -140,7 +140,7 @@ start_days = round.(Int, range(0, 365, length = N_TRAJ + 1))[1:end-1]
 
 
 # Prepare container for metrics and heatmap data
-sums = map(_ -> zeros(Float64, MAX_HORIZON), METRICS)       # = (; rmse=[0,0,...],  bias=[0,0,...], ...)
+sums = (; (var => map(_ -> zeros(Float64, MAX_HORIZON), METRICS) for var in VARS)...)
 kept = nothing
 
 
@@ -149,6 +149,7 @@ for (i,s) in enumerate(start_days)
 
     # Initialize simulation
     sim  = initialize!(MODEL(SG; longwave_radiation = scheme))
+
 
     # Sample trajectory
     traj = sample_grid_trajectory(
@@ -159,15 +160,22 @@ for (i,s) in enumerate(start_days)
         n_gap = n_steps_day
     )
 
+    # Throw error if varaible not available
+    isnothing(traj) && error("Trajectory sampling failed: VARS = $VARS not available in $(MODEL).")
+
 
     # Loop over horizons
     for h in 1:MAX_HORIZON
-        f = traj.temperature[h + 1]                     # sampled trajectroy temperature
-        t = reference[s + h + 1].grid.temperature       # reference temperature at day s+h
-            
-        # Calculate metric and add to sums
-        for (name, metric) in pairs(METRICS)
-            sums[name][h] += metric(f, t)
+
+        # Loop over variables
+        for var in VARS
+            f = traj.[var][h + 1]                           # sampled trajectroy 
+            t = getfield(reference[s+h+1].grid, var)        # reference at day s+h
+                
+            # Calculate metric and add to sums
+            for (name, metric) in pairs(METRICS)
+                sums[var][name][h] += metric(f,t)
+            end
         end
     end
 
@@ -178,12 +186,13 @@ for (i,s) in enumerate(start_days)
 end
 
 # Calculate mean in respect to all starting days
-rollout_stats = map(v -> v ./ length(start_days), sums)
+rollout_stats = map(metrics -> map(c -> c ./ length(start_days), metrics), sums)
 
 
 # Collet rollout results
 rollout = (;
     days            = 1:MAX_HORIZON,
+    vars            = VARS,
     curve           = rollout_stats,
     heatmap_days    = HEATMAP_DAYS,
     heatmap_states  = kept, 
@@ -212,6 +221,9 @@ write_info(;
 
     trunc        = TRUNC, 
     nlayers      = NLAYERS,
+
+    model        = MODEL,
+    vars         = [string(v) for v in VARS],
 
     scheme       = scheme_name(SCHEME),
     reference    = REFERENCE,

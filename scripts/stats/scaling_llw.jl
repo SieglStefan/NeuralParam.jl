@@ -12,7 +12,6 @@
 # Load packages
 using Revise
 using NeuralParam
-using JLD2
 using CairoMakie
 
 

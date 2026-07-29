@@ -54,7 +54,7 @@ LW_SCHEME  = get(v, :lw_scheme, nothing)        # used longwave radiation scheme
 # Sampling
 T_SPINUP   = get(v, :t_spinup, Day(1))                  # spinup time in days
 START_DATE = get(v, :start_date, DateTime(2000, 1, 1))  # sampling starting date
-SIM_DAYS   = get(v, :sim_days, 30)                      # sampling time in days
+SIM_DAYS   = get(v, :sim_days, 5)                       # sampling time in days
 
 # Perturbation
 FAC_PERT_T = get(v, :fac_pert_t, 2f0)           # additive perturbation amplitude for temperature
@@ -125,22 +125,22 @@ write_info(;
     path = folderpath, 
     file = "info.toml",
 
-    name            = NAME,
-    created         = now(),
-    seed            = SEED,
-    julia           = string(VERSION),
-    sw              = string(pkgversion(SpeedyWeather)),
+    name        = NAME,
+    created     = now(),
+    seed        = SEED,
+    julia       = string(VERSION),
+    sw          = string(pkgversion(SpeedyWeather)),
     
-    trunc           = TRUNC,
-    nlayers         = NLAYERS,
+    trunc       = TRUNC,
+    nlayers     = NLAYERS,
 
-    model           = nameof(MODEL),
-    lw_scheme       = nameof(typeof(LW_SCHEME)),
+    model       = nameof(MODEL),
+    lw_scheme   = nameof(typeof(LW_SCHEME)),
     
-    t_spinup        = string(T_SPINUP),
-    start_date      = string(START_DATE),
-    sim_days        = SIM_DAYS,
+    t_spinup    = string(T_SPINUP),
+    start_date  = string(START_DATE),
+    sim_days    = SIM_DAYS,
 
-    fac_pert_t      = FAC_PERT_T,
-    fac_pert_q      = FAC_PERT_Q,
+    fac_pert_t  = FAC_PERT_T,
+    fac_pert_q  = FAC_PERT_Q,
 )
