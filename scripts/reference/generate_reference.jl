@@ -92,35 +92,42 @@ SpeedyWeather.first_timesteps!(sim)
 
 
 
-### Start data sampling
-# Create container for variable states with a first entry
-reference = [deepcopy(sim.variables)]
-
-
-# Loop over the whole simulation
-for day in 1:SIM_DAYS
-
-    # Propagate simulation for one day
-    for _ in 1:steps_per_day
-        SpeedyWeather.later_timestep!(sim)
-    end
-
-    # Save state
-    push!(reference, deepcopy(sim.variables))
-end
-
-
-
 ### Save reference data
 # Create folder
 foldername = "$(NAME)"
 folderpath = prepare_out_dir(reference_dir(), foldername)
 
-# Save reference
-NeuralParam.save(reference; path=folderpath, file="reference.jld2")
+
+
+### Start data sampling
+save_store(; path=folderpath, file="reference.jld2") do store
+
+    # Save the initial state (day 0)
+    store["day_0/full"] = sim.variables
+    store["day_0/grid"] = sim.variables.grid
+
+    # Loop over the whole simulation
+    for day in 1:SIM_DAYS
+
+        # Propagate simulation for one day
+        for _ in 1:steps_per_day
+            SpeedyWeather.later_timestep!(sim)
+        end
+
+        # Save state
+        store["day_$(day)/full"] = sim.variables
+        store["day_$(day)/grid"] = sim.variables.grid
+    end
+
+    # Written last: its presence marks the file as complete
+    store["sim_days"] = SIM_DAYS
+end
+
 @info "Reference dataset stored at $(folderpath)!"
 
-# Create and store info.toml file
+
+
+### Create and store info.toml file
 write_info(; 
     path = folderpath, 
     file = "info.toml",

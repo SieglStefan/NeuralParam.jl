@@ -104,3 +104,37 @@ function fresh_out_dir(folderpath, folder_name)
     
     return mkpath(out_dir)
 end
+
+
+
+
+### XXX Lazily-read reference dataset: one full model state per simulated day
+struct Reference{S}
+    store::S            # open .jld2 file — states are read on demand, not held in RAM
+    sim_days::Int       # last available day; valid days are 0:sim_days
+end
+
+# XXX Index by simulated day directly: ref[0] is the initial state, ref[12] the state after 12 days
+Base.getindex(ref::Reference, day::Integer)  = ref.store["day_$(day)/full"]
+
+
+# XXX Grid fields only — much smaller read, used for the metric comparisons
+grid_state(ref::Reference, day::Integer)     = ref.store["day_$(day)/grid"]
+
+# XXX Open a stored reference for the duration of the callback
+function with_reference(fn, name::AbstractString)
+    JLD2.jldopen(joinpath(reference_dir(name), "reference.jld2"), "r") do store
+        fn(Reference(store, store["sim_days"]))
+    end
+end
+
+
+# Open a .jld2 store for incremental writing; the callback receives the open file
+function save_store(fn; path, file)
+    mkpath(path)
+    filepath = joinpath(path, file)
+    JLD2.jldopen(filepath, "w") do store
+        fn(store)
+    end
+    return filepath
+end

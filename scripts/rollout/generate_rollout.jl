@@ -125,7 +125,6 @@ HEATMAP_TRAJ = get(v, :heatmap_traj, 1)             # choice of specific traject
 
 ### Load to be rolled out scheme and reference
 scheme = resolve_scheme(SCHEME)
-reference = NeuralParam.load(; path=reference_dir(REFERENCE), file="reference.jld2")
 
 
 
@@ -142,48 +141,60 @@ start_days = round.(Int, range(0, ROLLOUT_T, length = N_TRAJ + 1))[1:end-1]
 
 # Prepare container for metrics and heatmap data
 curves = (; (var => map(_ -> zeros(Float64, MAX_HORIZON, length(start_days)), METRICS) for var in VARS)...)
-kept = nothing
 
 
 # Loop over all starting days in a year e.g.: (0,7,14,...,350,364)
-for (i,s) in enumerate(start_days)
+kept = with_reference(REFERENCE) do ref
 
-    # Initialize simulation
-    sim  = initialize!(MODEL(SG; longwave_radiation = scheme))
-
-
-    # Sample trajectory
-    traj = sample_grid_trajectory(
-        sim,
-        VARS, 
-        reference[s + 1]; 
-        n_steps = MAX_HORIZON * n_steps_day,
-        n_gap = n_steps_day
+    # Check the reference covers the whole rollout
+    n_needed = maximum(start_days) + MAX_HORIZON
+    lastindex(ref) ≥ n_needed || error(
+        "Reference '$REFERENCE' covers $(ref.sim_days) days, need $n_needed " *
+        "(rollout_t = $ROLLOUT_T, max_horizon = $MAX_HORIZON, n_traj = $N_TRAJ)."
     )
 
-    # Throw error if varaible not available
-    isnothing(traj) && error("Trajectory sampling failed: VARS = $VARS not available in $(MODEL).")
+    # Container for the heatmap states of one trajectory
+    heatmaps = nothing
 
+    for (i, s) in enumerate(start_days)
 
-    # Loop over horizons
-    for h in 1:MAX_HORIZON
+        # Initialize simulation
+        sim = initialize!(MODEL(SG; longwave_radiation = scheme))
 
-        # Loop over variables
-        for var in VARS
-            f = traj[var][h + 1]                            # sampled trajectroy 
-            t = getfield(reference[s+h+1].grid, var)        # reference at day s+h
-                
-            # Calculate metric and add to sums
-            for (name, metric) in pairs(METRICS)
-                curves[var][name][h, i] = metric(f, t)
+        # Sample trajectory
+        traj = sample_grid_trajectory(
+            sim,
+            VARS,
+            ref[s];
+            n_steps = MAX_HORIZON * n_steps_day,
+            n_gap = n_steps_day
+        )
+
+        # Throw error if variable not available
+        isnothing(traj) && error("Trajectory sampling failed: VARS = $VARS not available in $(MODEL).")
+
+        # Loop over horizons
+        for h in 1:MAX_HORIZON
+
+            # Loop over variables
+            for var in VARS
+                f = traj[var][h + 1]                        # sampled trajectory at day h
+                t = getfield(grid_state(ref, s + h), var)   # reference at day s+h
+
+                # Calculate metrics
+                for (name, metric) in pairs(METRICS)
+                    curves[var][name][h, i] = metric(f, t)
+                end
             end
+        end
+
+        # Filter specific heatmap days
+        if i == HEATMAP_TRAJ
+            heatmaps = (; (var => [traj[var][d+1] for d in HEATMAP_DAYS] for var in VARS)...)
         end
     end
 
-    # Filter specific heatmap days
-    if i == HEATMAP_TRAJ
-        global kept = (; (var => [traj[var][d+1] for d in HEATMAP_DAYS] for var in VARS)...)
-    end
+    return heatmaps
 end
 
 
