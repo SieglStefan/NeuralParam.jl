@@ -12,17 +12,17 @@ function setup_simulations(
 )
 
     # Create template model and simulation for later copying
-    model_template = run_config.model(spectral_grid;)
+    model_template = run_config.model(spectral_grid; longwave_radiation = run_config.lw_scheme)
     sim_template = initialize!(model_template)
 
     # XXX Create target and training simulation and do a first timestep (initalize implicit solver)
     model_target = run_config.model(spectral_grid; longwave_radiation = run_config.lw_scheme)
-    sim_target   = initialize!(model_target)
+    sim_target = initialize!(model_target)
     SpeedyWeather.initialize!(sim_target, steps=0)
     SpeedyWeather.first_timesteps!(sim_target)
 
-    model_train  = run_config.model(spectral_grid; longwave_radiation = lw_radiation_train)
-    sim_train    = initialize!(model_train)
+    model_train = run_config.model(spectral_grid; longwave_radiation = lw_radiation_train)
+    sim_train = initialize!(model_train)
     SpeedyWeather.initialize!(sim_train, steps=0)
     SpeedyWeather.first_timesteps!(sim_train)
 

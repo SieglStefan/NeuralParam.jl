@@ -45,7 +45,7 @@ v = variants[task+1]
 ### Define and extract parameters
 # General
 NAME       = get(v, :name, "default")           # name of the reference data
-SEED       = get(v, :seed, 42)                  # used seed
+SEED       = get(v, :seed, 1234)                  # used seed
 
 # Model and scheme
 MODEL      = get(v, :model, PrimitiveWetModel)  # used model
@@ -53,8 +53,8 @@ LW_SCHEME  = get(v, :lw_scheme, nothing)        # used longwave radiation scheme
 
 # Sampling
 T_SPINUP   = get(v, :t_spinup, Day(1))                  # spinup time in days
-START_DATE = get(v, :start_date, DateTime(2000, 1, 1))  # sampling starting date
-SIM_DAYS   = get(v, :sim_days, 5)                       # sampling time in days
+START_DATE = get(v, :start_date, DateTime(2001, 1, 1))  # sampling starting date
+SIM_DAYS   = get(v, :sim_days, 2*365)                       # sampling time in days
 
 # Perturbation
 FAC_PERT_T = get(v, :fac_pert_t, 2f0)           # additive perturbation amplitude for temperature

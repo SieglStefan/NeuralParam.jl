@@ -46,28 +46,28 @@ v = variants[task+1]
 ### Define and extract parameters
 # General
 NAME        = get(v, :name, "default")
-SEED        = get(v, :seed, 1234)
+SEED        = get(v, :seed, 42)
 
 # Model and scheme
 MODEL       = get(v, :model, PrimitiveWetModel)
 LW_SCHEME   = get(v, :lw_scheme, OneBandLongwave(SG; transmissivity = FriersonLongwaveTransmissivity(SG)))
 
 # Learning rate
-ETA0        = get(v, :eta0, 1f-3)
-ETA_DECAY   = get(v, :eta_decay, 0.9f0)
+ETA0        = get(v, :eta0, 1f-1)
+ETA_DECAY   = get(v, :eta_decay, 0.7f0)
 
 # Spinup and start date
-T_SPINUP    = get(v, :t_spinup, Day(1))
+T_SPINUP    = get(v, :t_spinup, Day(30))
 START_DATE  = get(v, :start_date, DateTime(2000, 1, 1))
 
 # Training steps parameter
-N_IC        = get(v, :n_ic, 1)
-N_TRAJ      = get(v, :n_traj, 10)
-N_EPOCHS    = get(v, :n_epochs, 2)
-N_BATCH     = get(v, :n_batch, 2)
+N_IC        = get(v, :n_ic, 5)
+N_TRAJ      = get(v, :n_traj, 80)
+N_EPOCHS    = get(v, :n_epochs, 1)
+N_BATCH     = get(v, :n_batch, 4)
 N_STEPS_0   = get(v, :n_steps_0, 5)
 N_STEPS_INC = get(v, :n_steps_inc, 2)
-N_GAP       = get(v, :n_gap, 0)
+N_GAP       = get(v, :n_gap, 50)
 
 # Perturbation
 FAC_PERT_T  = get(v, :fac_pert_t, 2f0)
@@ -109,7 +109,7 @@ run_config = RunConfig(
     n_gap       = N_GAP,
     fac_pert_T  = FAC_PERT_T,
     fac_pert_q  = FAC_PERT_Q,
-    do_autodiff = false,
+    do_autodiff = true,
 )
 
 # Define output configuration

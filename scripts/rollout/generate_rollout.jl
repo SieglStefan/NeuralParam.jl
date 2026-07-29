@@ -148,7 +148,7 @@ kept = with_reference(REFERENCE) do ref
 
     # Check the reference covers the whole rollout
     n_needed = maximum(start_days) + MAX_HORIZON
-    lastindex(ref) ≥ n_needed || error(
+    ref.sim_days ≥ n_needed || error(
         "Reference '$REFERENCE' covers $(ref.sim_days) days, need $n_needed " *
         "(rollout_t = $ROLLOUT_T, max_horizon = $MAX_HORIZON, n_traj = $N_TRAJ)."
     )

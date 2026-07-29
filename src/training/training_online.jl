@@ -83,6 +83,8 @@ function training_online(;
     end
 
 
+    # Shuffle ics
+    bin_order = randperm(run_config.n_ic)
 
     # Loop over initial conditions
     for ic in 1:run_config.n_ic
@@ -91,7 +93,7 @@ function training_online(;
         n_steps = run_config.n_steps_0 + (ic-1) * run_config.n_steps_inc
 
         # Draw a starting date
-        start_date = sample_start_date(ic, run_config.n_ic)
+        start_date = sample_start_date(bin_order[ic], run_config.n_ic)
     
         # Prepare reference simulation 
         sim_ref = prepare_reference(sim_template, run_config, n_steps, start_date)
@@ -166,6 +168,7 @@ function training_online(;
                 # Update radiation scheme parameters after batch window
                 if do_update
                     lw_radiation_train = step.lw_radiation
+                    do_update = false
                 end
 
 

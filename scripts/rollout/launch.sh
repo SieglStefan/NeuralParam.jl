@@ -1,7 +1,7 @@
 #!/bin/bash
 #
 # Launch rollout generation (from repo root):
-#   ./scripts/rollout/launch.sh [ARRAY]
+#   bash scripts/rollout/launch.sh [ARRAY]
 #
 # ARRAY = which variants (see generate_rollout.jl), e.g. "0" or "0-2"
 
