@@ -38,7 +38,23 @@ function evaluate_benchmark(schemes::NamedTuple; kwargs...)
 end
 
 
-function print_benchmark()
+# Print benchmark results as a table, one row per scheme
+function print_benchmark(results::NamedTuple; baseline = first(keys(results)))
+
+    base = results[baseline].per_step_ms
+
+    println(rpad("scheme", 24), lpad("ms/step", 10), lpad("KB/step", 12),
+            lpad("allocs/step", 14), lpad("rel.", 8))
+    println("-"^68)
+
+    for (name, r) in pairs(results)
+        println(rpad(String(name), 24),
+                lpad(round(r.per_step_ms, digits = 3), 10),
+                lpad(round(r.per_step_kb, digits = 1), 12),
+                lpad(round(Int, r.per_step_allocs), 14),
+                lpad(string(round(r.per_step_ms / base, digits = 2), "×"), 8))
+    end
+
     return nothing
 end
 

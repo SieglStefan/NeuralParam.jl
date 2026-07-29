@@ -163,6 +163,7 @@ export
 
         ### evaluation
         # rollout.jl
+                rollout_curve,
                 plot_rollout,
         # benchmark.jl
                 evaluate_benchmark,

@@ -1,0 +1,42 @@
+[general]
+created = 2026-07-29T20:22:53.180Z
+julia = "1.10.11"
+name = "default"
+seed = 1234
+sw_vers = "0.20.1"
+
+[grid]
+grid_type = "OctahedralGaussianGrid"
+nlayers = 8
+trunc = 31
+
+[io]
+inputs = ["temperature"]
+outputs = ["none: scaled via ConstLinearLW parameters"]
+
+[model_type]
+lw_scheme = "OneBandLongwave"
+model = "PrimitiveWetModel"
+
+[perturbation]
+fac_pert_q = 0.20000000298023224
+fac_pert_t = 2.0
+
+[sampling]
+gap_real = 3.6388890743255615
+n_ic = 2
+n_stats = 100
+sample_gap = 3.65
+sim_time = 365
+start_date = "2000-01-01T00:00:00"
+t_spinup = "30 days"
+
+[stats.input]
+T_mean = [233.00596618652344, 230.99777221679688, 234.5056610107422, 245.5778350830078, 256.0539855957031, 264.6219787597656, 272.1975402832031, 279.710205078125]
+T_std = [9.037813186645508, 8.595144271850586, 12.026867866516113, 15.975295066833496, 16.1679630279541, 15.757540702819824, 15.218411445617676, 15.524618148803711]
+lengths = [8]
+order = ["T"]
+
+[stats.output]
+lengths = []
+order = []

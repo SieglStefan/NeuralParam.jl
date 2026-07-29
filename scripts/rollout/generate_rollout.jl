@@ -89,6 +89,20 @@ variants = [
         reference       = REF_OBLW,
         STAB...
     ),
+
+    ### Default NeuralLinearLW rollouts
+    # 7. Skill
+    (;  name            = "NLLW_default_skill",
+        scheme          = "NLLW_default",
+        reference       = REF_OBLW,
+        SKILL...
+    ),
+    # 8. Stability
+    (;  name            = "NLLW_default_stab",
+        scheme          = "NLLW_default",
+        reference       = REF_OBLW,
+        STAB...
+    ),
 ]
 
 # Get task number and choose task
