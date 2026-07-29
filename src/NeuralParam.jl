@@ -111,6 +111,7 @@ export
                 info_scheme, 
         # neural_linear.jl
                 NeuralLinearLW,
+                warmstart!,
                         # (-//-)
         ## /abr
         # neural_abr.jl

@@ -8,7 +8,7 @@
 using Revise
 using NeuralParam
 using SpeedyWeather
-using Dates
+using Dates, Random
 
 
 
@@ -85,6 +85,9 @@ ps = (; a=a, b=b)
 foldername = "CLLW_$(NAME)"
 folderpath = prepare_out_dir(scheme_dir(), foldername)
 
+# Set seed for reproducability
+Random.seed!(SEED)
+
 
 
 ### Calibration
@@ -113,7 +116,7 @@ run_config = RunConfig(
 )
 
 # Define output configuration
-output_config = OutputConfig(output_path = folderpath, printing_traj=true)
+output_config = OutputConfig(output_path = folderpath)
 
 # Run the calibration
 scheme_trained, L, PN, GN = run_training(
@@ -138,8 +141,8 @@ write_info(;
     ),
 
     grid = (;
-        trunc   = TRUNC,
-        nlayers = NLAYERS,
+        trunc       = TRUNC,
+        nlayers     = NLAYERS,
         grid_type   = string(nameof(SG.Grid)),
     ),
 

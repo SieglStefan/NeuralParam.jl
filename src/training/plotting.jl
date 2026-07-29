@@ -50,7 +50,7 @@ function plot_training(
         legend = false, 
         loss_kwargs...,
     )
-    Plots.plot!(p1, xb, bmean(loss); label = "batch mean", lw = 2, color = :red)
+    Plots.plot!(p1, xb, bmean(loss); label = "batch mean", lw = 2, color = :black)
 
     # Parameter norm plot
     p2 = Plots.plot(
@@ -60,7 +60,7 @@ function plot_training(
         legend = false,  
         pnorm_kwargs...,
     )
-    Plots.plot!(p2, xb, bmean(pnorm); label = "batch mean", lw = 2, color = :red)
+    Plots.plot!(p2, xb, bmean(pnorm); label = "batch mean", lw = 2, color = :black)
 
     # Gradient norm plot
     p3 = Plots.plot(
@@ -71,7 +71,7 @@ function plot_training(
         legend = false,  
         gnorm_kwargs...,
     )
-     Plots.plot!(p3, xb, bmean(gnorm); label = "batch mean", lw = 2, color = :red)
+     Plots.plot!(p3, xb, bmean(gnorm); label = "batch mean", lw = 2, color = :black)
 
     defaults = (; size = (600, 900), left_margin = 8Plots.mm)
     merged = merge(defaults, plot_kwargs)

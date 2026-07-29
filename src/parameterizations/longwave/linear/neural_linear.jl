@@ -28,8 +28,8 @@ end
 function NeuralLinearLW(
     spectral_grid::SpectralGrid,
     arch_config;
-    zscore_folder = nothing,    # folder in data/stats containing zscore stats
-    scaling_folder = nothing,   # folder in data/stats containing scaling stats
+    zscore_folder = "zscore_llw_default",       # folder in data/stats containing zscore stats
+    scaling_folder = "scaling_llw_default",     # folder in data/stats containing scaling stats
     standard_scaling = false,   # use standard scaling 
     rng = Random.default_rng(),
 )
@@ -49,26 +49,13 @@ function NeuralLinearLW(
 
 
     # Load zscore statistics
-    if isnothing(zscore_folder)
-        zs_folder = "zscore_llw_default"
-    else
-        zs_folder = zscore_folder
-    end
-    
-    zscore = ZScoreStats(zs_folder, arch)
-
+    zscore = ZScoreStats(zscore_folder, arch)
 
     # Load scaling statistics
-    if standard_scaling == false
-        if isnothing(scaling_folder)
-            sc_folder = "scaling_llw_default"
-        else
-            sc_folder = scaling_folder
-        end
-
-        scaling = Scaling(sc_folder, arch)
-    else
+    if standard_scaling == true
         scaling = Scaling(nlayers)
+    else
+        scaling = Scaling(scaling_folder, arch)
     end
 
 
@@ -153,3 +140,21 @@ end
 
 # Define meta data for a NeuralLinearLW parameterization
 info_scheme(s::NeuralLinearLW) = (; scheme="NeuralLinearLW", n_in=s.n_in, n_out=s.n_out, info_arch(s.arch_config)...)
+
+
+
+
+# XXX Warm-start the NN so it reproduces a calibrated ConstLinearLW exactly
+function warmstart!(lw::NeuralLinearLW)
+
+    # Extract final Dense layer of the nn
+    key = last(keys(lw.ps))
+    W, B = lw.ps[key].weight, lw.ps[key].bias
+
+    # Zero weights and set bias, so the nn reproduces the calibrated scheme
+    fill!(W, 0f0)
+    B[1:2:end] .= -1f0      # a outputs (cooling)
+    B[2:2:end] .=  1f0      # b outputs
+
+    return lw
+end

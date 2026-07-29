@@ -215,6 +215,7 @@ function training_online(;
         # Plot current loss trajectory after every ic
         if output_config.plots_save
             p = plot_training(L, PN, GN;
+                n_batch = run_config.n_batch,
                 plot_kwargs=(;plot_title = "until IC nr. $(ic) / $(run_config.n_ic)"),)
 
             dir = joinpath(output_path, output_config.plots_folder)

@@ -13,19 +13,19 @@
     model::Type = PrimitiveWetModel     # model used for training
     lw_scheme::Union{Nothing, SpeedyWeather.AbstractLongwave} = nothing     # target LW scheme
 
-    eta0::Float32 = 1f-3                # initial learning rate       
-    eta_decay::Float32 = 0.9f0          # learning rate decay after an ic         
+    eta0::Float32 = 1f-2                # initial learning rate       
+    eta_decay::Float32 = 0.8f0          # learning rate decay after an ic         
 
-    t_spinup = Day(31)                  # spinup time before training
+    t_spinup = Day(30)                  # spinup time before training
     start_date = DateTime(2000, 1, 1)   # start date of simulation
 
     n_ic::Int = 5                       # nr. of ic used for training
-    n_traj::Int = 20                    # nr. of trajectroies per ic u.f.t.
+    n_traj::Int = 100                   # nr. of trajectroies per ic u.f.t.
     n_epochs::Int = 1                   # nr. of epochs per trajectory u.f.t.
-    n_batch::Int = 1                    # batch size for training
-    n_steps_0::Int = 20                 # nr. of initial training steps per update
-    n_steps_inc::Int = 10               # increase of n_steps after an ic
-    n_gap::Int = 25                     # nr. of timestep!() between two trajectories
+    n_batch::Int = 4                    # batch size for training
+    n_steps_0::Int = 5                  # nr. of initial training steps per update
+    n_steps_inc::Int = 2                # increase of n_steps after an ic
+    n_gap::Int = 50                     # nr. of timestep!() between two trajectories
 
     fac_pert_T::Float32 = 2f0           # additive perturbation factor for temperature
     fac_pert_q::Float32 = 0.2f0         # multiplicative perturbation factor for humidity
