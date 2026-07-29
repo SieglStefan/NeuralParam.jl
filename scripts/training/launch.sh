@@ -6,4 +6,4 @@
 SCRIPT=${1:?"Usage: ./scripts/training/launch.sh <name-without-.jl> [ARRAY]"}
 ARRAY=${2:-0}
 mkdir -p slurm_logs
-sbatch --array="$ARRAY" scripts/training/submit.sh "$SCRIPT"
+sbatch --job-name="$SCRIPT" --array="$ARRAY" scripts/training/submit.sh "$SCRIPT"

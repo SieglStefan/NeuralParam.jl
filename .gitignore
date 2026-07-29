@@ -3,6 +3,7 @@
 results_OLD/
 sandbox/
 slurm_logs/
+commands_hpc.toml
 
 # Reference data is 10+ GB - synced via rsync, not git
 data/reference/*

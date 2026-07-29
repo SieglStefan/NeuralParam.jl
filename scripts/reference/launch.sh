@@ -8,7 +8,7 @@
 ARRAY=${1:-0}
 mkdir -p slurm_logs
 
-sbatch --job-name="ref" \
+sbatch --job-name="reference" \
        --array="$ARRAY" \
        --output="slurm_logs/ref_%A_%a.out" \
        --error="slurm_logs/ref_%A_%a.err" \
