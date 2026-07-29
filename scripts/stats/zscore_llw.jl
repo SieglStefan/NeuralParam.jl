@@ -40,10 +40,10 @@ MODEL       = PrimitiveWetModel                                                 
 LW_SCHEME   = OneBandLongwave(SG; transmissivity = FriersonLongwaveTransmissivity(SG))          # used LW scheme
 
 # Sampling
-T_SPINUP    = 30                    # spinup time in days
-START_DATE  = Date(2000, 1, 1)      # start date of simulation
+T_SPINUP    = Day(30)                    # spinup time in days
+START_DATE  = DateTime(2000, 1, 1)      # start date of simulation
 N_IC        = 1                     # number of initial conditions
-SIM_TIME    = 365                   # sampling time in days
+SIM_TIME    = 20                   # sampling time in days
 SAMPLE_GAP  = 3.65                  # days between sampling
 
 # Perturbation
@@ -69,12 +69,12 @@ SpeedyWeather.set!(sim_temp.variables.prognostic.clock; time = clock_start, star
 
 
 # Calulate number of timesteps for sampling
-n_steps_total = round(Int, SIM_TIME *3600 *24 /Δt_sec)
+n_steps_total = round(Int, SIM_TIME *3600 *24 /Δt_sec) + 1
 n_gap = round(Int, SAMPLE_GAP *3600 *24 /Δt_sec)
 
 # Print information
-@info "Total number of global samples per IC: ", n_steps_total ÷ n_gap
-@info "Time between samples (days): ", n_gap * Δt_sec /3600 /24
+@info "Total number of global samples per IC: $(n_steps_total ÷ n_gap)"
+@info "Time between samples (days): $(n_gap * Δt_sec /3600 /24)"
 
 
 # Declare temperature field container
@@ -96,26 +96,26 @@ for i in 1:N_IC
     # Plot heatmap if first ic for visualization of perturbation before spinup
     titles = ["TOA", "Between", "Surface"]
     if i == 1
-        temp_vec = [sim.variables.grid.temperature[:,k] for k in [1, Int(NLAYERS/2), NLAYERS]]
-        hum_vec = [log10.(sim.variables.grid.humidity[:,k] .+ 1f-9) for k in [1, Int(NLAYERS/2), NLAYERS]]
+        temp_vec = [sim.variables.grid.temperature[:,k] for k in [1, Int(NLAYERS÷2), NLAYERS]]
+        hum_vec = [log10.(sim.variables.grid.humidity[:,k] .+ 1f-9) for k in [1, Int(NLAYERS÷2), NLAYERS]]
         
         display(plot_heatmaps(temp_vec; titles, suptitle = "Temperature before Spinup", coastlines=false))
-        display(plot_heatmaps(hum_vec; titles, suptitle = "Humidity before Spinup", coastlines=false))
+        display(plot_heatmaps(hum_vec; titles, suptitle = "Log10 Humidity before Spinup", coastlines=false))
     end
 
 
     # Spinup model
-    run!(sim, period=Day(T_SPINUP))
+    run!(sim, period=T_SPINUP)
 
 
     # Plot heatmap if first ic for visualization of perturbation after spinup
     titles = ["TOA", "Between", "Surface"]
     if i == 1
-        temp_vec = [sim.variables.grid.temperature[:,k] for k in [1, Int(NLAYERS/2), NLAYERS]]
-        hum_vec = [log10.(sim.variables.grid.humidity[:,k] .+ 1f-9) for k in [1, Int(NLAYERS/2), NLAYERS]]
+        temp_vec = [sim.variables.grid.temperature[:,k] for k in [1, Int(NLAYERS÷2), NLAYERS]]
+        hum_vec = [log10.(sim.variables.grid.humidity[:,k] .+ 1f-9) for k in [1, Int(NLAYERS÷2), NLAYERS]]
         
         display(plot_heatmaps(temp_vec; titles, suptitle = "Temperature after Spinup", coastlines=false))
-        display(plot_heatmaps(hum_vec; titles, suptitle = "Humidity after Spinup", coastlines=false))
+        display(plot_heatmaps(hum_vec; titles, suptitle = "Log10 Humidity after Spinup", coastlines=false))
     end
 
 
@@ -124,7 +124,7 @@ for i in 1:N_IC
     SpeedyWeather.first_timesteps!(sim)
 
 
-    # Propagate the simulation and sample temperature fields
+    # Propagate the simulation and sample fields
     for step in 1:n_steps_total
 
         # Do a timestep
@@ -154,7 +154,7 @@ input_std = T_std
 
 # Output mean and std are not used, but need to be defined
 output_mean = 0f0
-output_std = 0f0
+output_std = 1f0
 
 
 
@@ -170,37 +170,63 @@ NeuralParam.save(
 )
 @info "Statistics $(foldername) stored at $(folderpath)!"
 
+
 # Create and store info.toml file
 write_info(;
     path = folderpath,
     file = "info.toml",
 
-    name =          NAME,
-    created =       now(),
-    seed =          SEED,
-    julia =         string(VERSION),
-    sw              = string(pkgversion(SpeedyWeather)),
+    general = (;
+        name    = NAME,
+        created = now(),
+        seed    = SEED,
+        julia   = string(VERSION),
+        sw_vers = string(pkgversion(SpeedyWeather)),
+    ),
 
-    trunc =         TRUNC,
-    nlayers =       NLAYERS,
+    io = (;
+        inputs  = ["temperature"],
+        outputs = ["none: scaled via ConstLinearLW parameters"],    
+    ),
 
-    model      =    nameof(MODEL),
-    lw_scheme =     string(nameof(typeof(LW_SCHEME))),   
+    stats = (;
+        input = (;
+            order   = ["T"],
+            lengths = [NLAYERS],
+            T_mean  = T_mean,       T_std = T_std,
+        ),
 
-    t_spinup =      T_SPINUP,
-    start_date      = string(START_DATE),
-    n_ic =          N_IC,
-    sim_time =      SIM_TIME,
-    sample_gap =    SAMPLE_GAP,
+        output = (;
+            order   = [],
+            lengths = [],
+        ),
+    ),
 
-    n_stats =       n_steps_total ÷ n_gap,
-    gap_real =      n_gap * Δt_sec /3600 /24,
+    grid = (;
+        trunc   = TRUNC,
+        nlayers = NLAYERS,
+        grid_type   = string(nameof(SG.Grid)),
+    ),
 
-    fac_pert_t        = FAC_PERT_T,
-    fac_pert_q           = FAC_PERT_Q,
+    model_type = (;
+        model       = nameof(MODEL),
+        lw_scheme   = string(nameof(typeof(LW_SCHEME))),   
+    ),
 
-    inputs =        ["temperature"],
-    outputs =       ["none: scaled via ConstLinearLW parameters"],
+    sampling = (;
+        t_spinup    = string(T_SPINUP),
+        start_date  = string(START_DATE),
+        n_ic        = N_IC,
+        sim_time    = SIM_TIME,
+        sample_gap  = SAMPLE_GAP,
+        n_stats     = n_steps_total ÷ n_gap,
+        gap_real    = n_gap * Δt_sec /3600 /24,
+    ),
+
+    perturbation = (;
+        fac_pert_t = FAC_PERT_T,
+        fac_pert_q = FAC_PERT_Q,
+    ),
 )
 
 
@@ -241,6 +267,7 @@ histo_T = plot_histograms(
     ["Layer $k" for k in 1:NLAYERS];
     suptitle = "Normalized Temperature Histograms",
     ncols = NLAYERS÷2)
+
 
 # Save histograms
 histopath = joinpath(folderpath, "histograms")

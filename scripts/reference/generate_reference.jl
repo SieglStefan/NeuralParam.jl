@@ -125,22 +125,34 @@ write_info(;
     path = folderpath, 
     file = "info.toml",
 
-    name        = NAME,
-    created     = now(),
-    seed        = SEED,
-    julia       = string(VERSION),
-    sw          = string(pkgversion(SpeedyWeather)),
+    general = (;
+        name    = NAME,
+        created = now(),
+        seed    = SEED,
+        julia   = string(VERSION),
+        sw_vers = string(pkgversion(SpeedyWeather)),
+    ),
     
-    trunc       = TRUNC,
-    nlayers     = NLAYERS,
+    grid = (;
+        trunc   = TRUNC,
+        nlayers = NLAYERS,
+        grid_type   = string(nameof(SG.Grid)),
+    ),
 
-    model       = nameof(MODEL),
-    lw_scheme   = nameof(typeof(LW_SCHEME)),
+    model_type = (;
+        model       = nameof(MODEL),
+        lw_scheme   = nameof(typeof(LW_SCHEME)),
+    ),
     
-    t_spinup    = string(T_SPINUP),
-    start_date  = string(START_DATE),
-    sim_days    = SIM_DAYS,
+    sampling = (;
+        t_spinup    = string(T_SPINUP),
+        start_date  = string(START_DATE),
+        sim_days    = SIM_DAYS,
+    ),
 
-    fac_pert_t  = FAC_PERT_T,
-    fac_pert_q  = FAC_PERT_Q,
+    perturbation = (;
+        fac_pert_t = FAC_PERT_T,
+        fac_pert_q = FAC_PERT_Q,
+    ),
 )
+

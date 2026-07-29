@@ -13,6 +13,7 @@
 using Revise
 using NeuralParam
 using CairoMakie
+using Dates
 
 
 # Define parameters for storing and loading
@@ -24,9 +25,10 @@ SCHEME = "CLLW_default"     # name of the calibrated scheme
 scheme = NeuralParam.load(; path=scheme_dir(SCHEME), file="scheme.jld2")
 
 
-# Extract parameter and calculate scaling
+# Extract parameter and calculate scaling and number of vertical layers
 sc_a = abs.(scheme.ps.a .* scheme.scaling.sc_a) 
 sc_b = abs.(scheme.ps.b .* scheme.scaling.sc_b) 
+nlayers = size(sc_a, 1)
 
 
 
@@ -35,15 +37,39 @@ sc_b = abs.(scheme.ps.b .* scheme.scaling.sc_b)
 foldername = "scaling_llw_$(NAME)"
 folderpath = prepare_out_dir(stats_dir(), foldername)
 
-# Save reference
+# Save stats
 NeuralParam.save((sc_a=sc_a, sc_b=sc_b); path=folderpath, file="stats.jld2")
-@info "Reference dataset stored at $(folderpath)!"
+@info "Statistics $(foldername) stored at $(folderpath)!"
+
+
+# Create and store info.toml file
+write_info(;
+    path = folderpath,
+    file = "info.toml",
+
+    general = (;
+        created = now(),
+        scheme  = SCHEME,
+    ),
+
+    stats = (;
+        input = (;
+            order   = [],
+            lengths = [],
+        ),
+
+        output = (;
+            order   = ["sc_a", "sc_b"],
+            lengths = [nlayers, nlayers],
+            sc_a = sc_a, sc_b = sc_b,
+        ),
+    ),
+)
 
 
 
 ### Plot loaded scaling parameters
-NLAYERS = size(sc_a, 1)
-layers = 1:NLAYERS
+layers = 1:nlayers
 fig = Figure()
 
 # Parameter a

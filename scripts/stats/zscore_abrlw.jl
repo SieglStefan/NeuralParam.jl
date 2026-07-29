@@ -25,33 +25,39 @@
 using Revise
 using NeuralParam
 using SpeedyWeather, AnalyticBandRadiation
-const SpeedyExt = Base.get_extension(AnalyticBandRadiation,
+SpeedyExt = Base.get_extension(AnalyticBandRadiation,
                                      :AnalyticBandRadiationSpeedyWeatherExt)
 using Statistics, Random, Dates
-using JLD2
 using CairoMakie
 
 
 
-### Define stats parameters
-# General
-NAME = "_default"             # name of statistics
-CREATED = now()       # date of creation
-SEED = 1234           # seed used    
+### Define spectral grid
+TRUNC = 31
+NLAYERS = 8
+SG = SpectralGrid(trunc=TRUNC, nlayers=NLAYERS)
 
-# Grid
-TRUNC = 31            # truncation of spectral grid
-NLAYERS = 8           # number of vertical layers
+
+
+### Define parameters for sampling
+# General
+NAME        = "default"             # name of statistics
+SEED        = 21                    # seed used    
+
+# Model and scheme
+MODEL       = PrimitiveWetModel                                 # used model
+LW_SCHEME   = SpeedyExt.SpeedyAnalyticBandLongwave(SG)          # used LW scheme
 
 # Sampling
-T_SPINUP = 30         # spinup time in days
-N_IC = 3              # number of initial conditions
-SIM_TIME = 365        # sampling time in days
-SAMPLE_GAP = 3.65     # days between sampling
+T_SPINUP    = Day(30)                    # spinup time in days
+START_DATE  = DateTime(2000, 1, 1)      # start date of simulation
+N_IC        = 1                     # number of initial conditions
+SIM_TIME    = 365                   # sampling time in days
+SAMPLE_GAP  = 3.65                  # days between sampling
 
 # Perturbation
-AMP_T = 2f0           # temperature perturbation amplitude (additive)
-AMP_Q = 0.2f0         # humidity perturbation amplitude (multiplicative)
+FAC_PERT_T  = 2f0                   # temperature perturbation amplitude
+FAC_PERT_Q  = 0.2f0                 # humidity perturbation amplitude (multiplicative)
 
 # Used standard values
 CO2 = 280f0           # default CO2 value 
@@ -59,57 +65,47 @@ OCEAN_EM = 1f0        # default ocean emissivity value (SW does not propagate ye
 LAND_EM = 1f0         # default land emissivity value (SW does not propagate yet)
 
 
-# Folder for stats files (.jld2, .png and .toml)
-foldername = "zscore_abrlw_L$(NLAYERS)$(NAME)"
-folderpath = joinpath(@__DIR__, "..", "..", "data", "stats", foldername)
-mkdir(folderpath)
-
-
 
 ### Prepare simulation
 # Set seed for reproducability
 Random.seed!(SEED)
 
-# Define spectral grid and model
-spectral_grid = SpectralGrid(trunc=TRUNC, nlayers=NLAYERS)
-LW_SCHEME = SpeedyExt.SpeedyAnalyticBandLongwave(spectral_grid)       # used parameterization scheme
-model = PrimitiveWetModel(spectral_grid; longwave_radiation = LW_SCHEME)
-
-# Create template simulation
+# Create model and initialize simulation
+model = MODEL(SG; longwave_radiation = LW_SCHEME)
 sim_temp = initialize!(model)
+
+# Set starting time for spinup
+clock_start = START_DATE - T_SPINUP
+SpeedyWeather.set!(sim_temp.variables.prognostic.clock; time = clock_start, start = clock_start)
 
 # Extract timestepping
 (; Δt_sec) = model.time_stepping
 
 
 # Calulate number of timesteps for sampling
-n_steps_total = round(Int, SIM_TIME *3600 *24 / Δt_sec) + 1
-n_gap = round(Int, SAMPLE_GAP *3600 *24 / Δt_sec)
+n_steps_total = round(Int, SIM_TIME *3600 *24 /Δt_sec) + 1
+n_gap = round(Int, SAMPLE_GAP *3600 *24 /Δt_sec)
+
+# Print information
+@info "Total number of global samples per IC: $(n_steps_total ÷ n_gap)"
+@info "Time between samples (days): $(n_gap * Δt_sec /3600 /24)"
 
 
 # Declare input field container
-T_layers = [Float32[] for _ in 1:NLAYERS]
-q_layers = [Float32[] for _ in 1:NLAYERS]
-p = Float32[]
-    #co2 = Float32[]        not needed, because standard value is always used
-sst = Float32[]
-lst = Float32[]
-    #lf = Float32[]         not needed, because land fraction is already in [0,1]
-    #ocean_em = Float32[]   not needed, because standard value is always used
-    #land_em = Float32[]    not needed, because standard value is always used
+T_layers        = [Float32[] for _ in 1:NLAYERS]
+q_layers        = [Float32[] for _ in 1:NLAYERS]
+p               = Float32[]
+    #co2        = Float32[]         not needed, because standard value is always used
+sst             = Float32[]
+lst             = Float32[]
+    #lf         = Float32[]         not needed, because land fraction is already in [0,1]
+    #ocean_em   = Float32[]         not needed, because standard value is always used
+    #land_em    = Float32[]         not needed, because standard value is always used
 
 # Declare output field container
-dT_layers = [Float32[] for _ in 1:NLAYERS]
-olw = Float32[]
-slwd = Float32[] 
-
-
-
-# Print information
-println("--------------------------------------------------------------------")
-println("Total number of global samples per IC: ", n_steps_total ÷ n_gap)
-println("Time between samples (days): ", n_gap * Δt_sec /3600 /24)
-println("--------------------------------------------------------------------")
+dT_layers       = [Float32[] for _ in 1:NLAYERS]
+olw             = Float32[]
+slwd            = Float32[] 
 
 
 
@@ -120,33 +116,33 @@ for i in 1:N_IC
     sim = deepcopy(sim_temp)
     
     # Perturbate temperature and humidity fields
-    perturb_grid_field!(sim, :temperature; fac_add=AMP_T)
-    perturb_grid_field!(sim, :humidity; fac_mult=AMP_Q, zeromin=true)
+    perturb_grid_field!(sim, :temperature; fac_add=FAC_PERT_T)
+    perturb_grid_field!(sim, :humidity; fac_mult=FAC_PERT_Q, zeromin=true)
 
 
     # Plot heatmap if first ic for visualization of perturbation before spinup
     titles = ["TOA", "Between", "Surface"]
     if i == 1
-        temp_vec = [sim.variables.grid.temperature[:,k] for k in [1, Int(NLAYERS/2), NLAYERS]]
-        hum_vec = [log10.(sim.variables.grid.humidity[:,k] .+ 1f-9) for k in [1, Int(NLAYERS/2), NLAYERS]]
+        temp_vec = [sim.variables.grid.temperature[:,k] for k in [1, Int(NLAYERS÷2), NLAYERS]]
+        hum_vec = [log10.(sim.variables.grid.humidity[:,k] .+ 1f-9) for k in [1, Int(NLAYERS÷2), NLAYERS]]
         
         display(plot_heatmaps(temp_vec; titles, suptitle = "Temperature before Spinup", coastlines=false))
-        display(plot_heatmaps(hum_vec; titles, suptitle = "Humidity before Spinup", coastlines=false))
+        display(plot_heatmaps(hum_vec; titles, suptitle = "Log10 Humidity before Spinup", coastlines=false))
     end
 
 
     # Spinup model
-    run!(sim, period=Day(T_SPINUP))
+    run!(sim, period=T_SPINUP)
 
 
     # Plot heatmap if first ic for visualization of perturbation after spinup
     titles = ["TOA", "Between", "Surface"]
     if i == 1
-        temp_vec = [sim.variables.grid.temperature[:,k] for k in [1, Int(NLAYERS/2), NLAYERS]]
-        hum_vec = [log10.(sim.variables.grid.humidity[:,k] .+ 1f-9) for k in [1, Int(NLAYERS/2), NLAYERS]]
+        temp_vec = [sim.variables.grid.temperature[:,k] for k in [1, Int(NLAYERS÷2), NLAYERS]]
+        hum_vec = [log10.(sim.variables.grid.humidity[:,k] .+ 1f-9) for k in [1, Int(NLAYERS÷2), NLAYERS]]
         
         display(plot_heatmaps(temp_vec; titles, suptitle = "Temperature after Spinup", coastlines=false))
-        display(plot_heatmaps(hum_vec; titles, suptitle = "Humidity after Spinup", coastlines=false))
+        display(plot_heatmaps(hum_vec; titles, suptitle = "Log10 Humidity after Spinup", coastlines=false))
     end
 
 
@@ -155,7 +151,7 @@ for i in 1:N_IC
     SpeedyWeather.first_timesteps!(sim)
 
 
-    # Propagate the simulation and sample temperature fields
+    # Propagate the simulation and sample fields
     for step in 1:n_steps_total
 
         # Do a timestep
@@ -233,6 +229,7 @@ for i in 1:N_IC
 end
 
 
+
 ### Calculate stats
 # Calculate mean and std of input fields
 T_mean = Float32[mean(T_layers[k]) for k in 1:NLAYERS]
@@ -284,21 +281,95 @@ output_std  = vcat(dT_std, olw_std, slwd_std)
 
 
 ### Store statistics
-file = "stats.jld2"
-filepath = joinpath(folderpath, file)
+# Create folder
+foldername = "zscore_abrlw_$(NAME)"
+folderpath = prepare_out_dir(stats_dir(), foldername)
 
-JLD2.jldsave(filepath;
-    input_mean,
-    input_std,
-    output_mean,
-    output_std,
+# Save stats
+NeuralParam.save(
+    (input_mean=input_mean, input_std=input_std, output_mean=output_mean, output_std=output_std); 
+    path=folderpath, file="stats.jld2"
+)
+@info "Statistics $(foldername) stored at $(folderpath)!"
+
+
+# Create and store info.toml file
+write_info(;
+    path = folderpath,
+    file = "info.toml",
+
+    general = (;
+        name    = NAME,
+        created = now(),
+        seed    = SEED,
+        julia   = string(VERSION),
+        sw_vers = string(pkgversion(SpeedyWeather)),
+    ),
+
+    io = (;
+        inputs          = ["Temperature profile, Humidity profile, surface pressure, CO2 concentration, Sea surface temperature, Land surface temperature, Land fraction, Ocean emissivity, Land Emissivity"],
+        outputs         = ["Temperature profile tendencies, Outgoing longwave, Surface longwave down"],
+        defaults        = ["CO2 concentration, Ocean emissivity, Land Emissivity"],
+        defaults_vals   = [CO2, OCEAN_EM, LAND_EM],
+    ),
+
+    stats = (;
+        input = (;
+            order   = ["T", "q", "p", "co2", "sst", "lst", "lf", "ocean_em", "land_em"],
+            lengths = [NLAYERS, NLAYERS, 1, 1, 1, 1, 1, 1, 1],
+
+            T_mean          = T_mean,           T_std        = T_std,
+            q_mean          = q_mean,           q_std        = q_std,
+            p_mean          = p_mean,           p_std        = p_std,
+            co2_mean        = co2_mean,         co2_std      = co2_std,
+            sst_mean        = sst_mean,         sst_std      = sst_std,
+            lst_mean        = lst_mean,         lst_std      = lst_std,
+            lf_mean         = lf_mean,          lf_std       = lf_std,
+            ocean_em_mean   = ocean_em_mean,    ocean_em_std = ocean_em_std,
+            land_em_mean    = land_em_mean,     land_em_std  = land_em_std,
+        ),
+
+        output = (;
+            order   = ["dT", "olw", "slwd"],
+            lengths = [NLAYERS, 1, 1],
+
+            dT_mean         = dT_mean,          dT_std       = dT_std,
+            olw_mean        = olw_mean,         olw_std      = olw_std,
+            slwd_mean       = slwd_mean,        slwd_std     = slwd_std,
+        ),
+    ),
+
+    grid = (;
+        trunc       = TRUNC,
+        nlayers     = NLAYERS,
+        grid_type   = string(nameof(SG.Grid)),
+    ),
+
+    model_type = (;
+        model       = nameof(MODEL),
+        lw_scheme   = string(nameof(typeof(LW_SCHEME))),   
+    ),
+
+    sampling = (;
+        t_spinup    = string(T_SPINUP),
+        start_date  = string(START_DATE),
+        n_ic        = N_IC,
+        sim_time    = SIM_TIME,
+        sample_gap  = SAMPLE_GAP,
+        n_stats     = n_steps_total ÷ n_gap,
+        gap_real    = n_gap * Δt_sec / 3600 / 24,
+    ),
+    
+    perturbation = (;
+        fac_pert_t  = FAC_PERT_T,
+        fac_pert_q  = FAC_PERT_Q,
+    ),
 )
 
 
 
 ### Plot vector results
 layers = 1:NLAYERS
-
 fig = Figure()
 
 # Temperature plot
@@ -339,76 +410,6 @@ CairoMakie.save(filepath, fig)
 
 
 
-### Print single results and dT (without plots):
-println("")
-println("Scalar Results:")
-println("\tInputs:")
-println("\t\t surface pressure mean: $p_mean")
-println("\t\t surface pressure std: $p_std")
-println("")
-println("\t\t sea surface temperature mean: $sst_mean")
-println("\t\t sea surface temperature std: $sst_std")
-println("")
-println("\t\t land surface temperature mean: $lst_mean")
-println("\t\t land surface temperature std: $lst_std")
-println("")
-println("\tOutputs:")
-println("\t\t Temperature tendencies mean: $dT_mean")
-println("\t\t Temperature tendencies std: $dT_std")
-println("")
-println("\t\t outgoing LW mean: $olw_mean")
-println("\t\t outgoing LW std: $olw_std")
-println("")
-println("\t\t Surface LW down mean: $slwd_mean")
-println("\t\t Surface LW down std: $slwd_std")
-println("")
-
-
-
-write_info(;
-    path = folderpath,
-    file = "meta.toml",
-
-    provenance = (;
-        name    = NAME,
-        created = CREATED,
-        seed    = SEED,
-        julia   = string(VERSION),
-    ),
-
-    io = (;
-        inputs        = ["Temperature profile, Humidity profile, surface pressure, CO2 concentration, Sea surface temperature, Land surface temperature, Land fraction, Ocean emissivity, Land Emissivity"],
-        outputs       = ["Temperature profile tendencies, Outgoing longwave, Surface longwave down"],
-        defaults      = ["CO2 concentration, Ocean emissivity, Land Emissivity"],
-        defaults_vals = [CO2, OCEAN_EM, LAND_EM],
-    ),
-
-    scheme = (;
-        lw_scheme = string(nameof(typeof(LW_SCHEME))),
-    ),
-
-    grid = (;
-        trunc   = TRUNC,
-        nlayers = NLAYERS,
-    ),
-
-    sampling = (;
-        t_spinup   = T_SPINUP,
-        n_ic       = N_IC,
-        sim_time   = SIM_TIME,
-        sample_gap = SAMPLE_GAP,
-        n_stats    = n_steps_total ÷ n_gap,
-        gap_real   = n_gap * Δt_sec / 3600 / 24,
-    ),
-    
-    perturbation = (;
-        amp_t = AMP_T,
-        amp_q = AMP_Q,
-    ),
-)
-
-
-
 ### Create histogram plots for validation
 # Input fields
 histo_T = plot_histograms(
@@ -423,7 +424,7 @@ histo_q = plot_histograms(
     ncols = NLAYERS÷2)
 hist_scalar_in = plot_histograms(
     [zscore(p, p_mean, p_std), zscore(sst, sst_mean, sst_std), zscore(lst, lst_mean, lst_std)], 
-    ["Surface Pressure", "Sea Surface Temperature", "Land Surface Temperature", "Land Fraction"],
+    ["Surface Pressure", "Sea Surface Temperature", "Land Surface Temperature"],
     suptitle = "Scalar Input Histograms", 
     ncols = 4)
 
@@ -440,7 +441,7 @@ hist_fluxes = plot_histograms(
     ncols = 2)
 
 
-# Save Histograms
+# Save histograms
 histopath = joinpath(folderpath, "histograms")
 mkpath(histopath)
 

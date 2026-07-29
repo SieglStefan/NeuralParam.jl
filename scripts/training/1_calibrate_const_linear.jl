@@ -129,34 +129,52 @@ write_info(;
     path = folderpath, 
     file = "info.toml",
 
-    name        = NAME, 
-    created     = now(), 
-    seed        = SEED,
-    julia       = string(VERSION), 
-    sw          = string(pkgversion(SpeedyWeather)),
+    general = (;
+        name        = NAME, 
+        created     = now(), 
+        seed        = SEED,
+        julia       = string(VERSION), 
+        sw_vers     = string(pkgversion(SpeedyWeather)),
+    ),
 
-    trunc       = TRUNC, 
-    nlayers     = NLAYERS,
+    grid = (;
+        trunc   = TRUNC,
+        nlayers = NLAYERS,
+        grid_type   = string(nameof(SG.Grid)),
+    ),
 
-    model       = nameof(MODEL), 
-    lw_scheme   = nameof(typeof(LW_SCHEME)),
+    model_type = (;
+        model       = nameof(MODEL), 
+        lw_scheme   = nameof(typeof(LW_SCHEME)),
+    ),
 
-    eta0        = ETA0, 
-    eta_decay   = ETA_DECAY,
+    learning_rate = (;
+        eta0        = ETA0, 
+        eta_decay   = ETA_DECAY,
+    ),
 
-    t_spinup    = string(T_SPINUP), 
-    start_date  = string(START_DATE),
+    training_time = (;
+        t_spinup    = string(T_SPINUP), 
+        start_date  = string(START_DATE),
+    ),
 
-    n_ic        = N_IC, 
-    n_traj      = N_TRAJ, 
-    n_epochs    = N_EPOCHS,
-    n_steps_0   = N_STEPS_0, 
-    n_steps_inc = N_STEPS_INC, 
-    n_gap       = N_GAP,
+    steps = (;
+        n_ic        = N_IC, 
+        n_traj      = N_TRAJ, 
+        n_epochs    = N_EPOCHS,
+        n_batch     = N_BATCH,
+        n_steps_0   = N_STEPS_0, 
+        n_steps_inc = N_STEPS_INC, 
+        n_gap       = N_GAP,
+    ),
 
-    fac_pert_t  = FAC_PERT_T, 
-    fac_pert_q  = FAC_PERT_Q,
+    perturbation = (;
+        fac_pert_t = FAC_PERT_T,
+        fac_pert_q = FAC_PERT_Q,
+    ),
 
-    scheme      = info_scheme(scheme_trained),
-    final_loss  = L[end]
+    final = (;
+        scheme      = info_scheme(scheme_trained),
+        final_loss  = L[end]
+    ),
 )

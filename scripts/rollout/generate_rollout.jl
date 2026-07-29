@@ -42,7 +42,7 @@ STAB        = (; max_horizon = 180, n_traj = 4,  heatmap_days = [1,30,90,180])
 ### Define possible variants for rollouts
 variants = [
 
-    ### 0. Default - no used
+    ### 0. Default - not used
     (;),
 
 
@@ -112,6 +112,7 @@ VARS         = get(v, :vars, (:temperature,))       # sampled variables
 # Rollout
 MAX_HORIZON  = get(v, :max_horizon, 31)             # maximum forecast length in days
 N_TRAJ       = get(v, :n_traj, 52)                  # number of trajectories sampled
+ROLLOUT_T    = get(v, :rollout_t, 365)              # sampling time of rollout
 
 # Metrics
 METRICS      = get(v, :metrics, (; rmse, bias))     # metrics to be calculated
@@ -136,11 +137,11 @@ reference = NeuralParam.load(; path=reference_dir(REFERENCE), file="reference.jl
 n_steps_day = steps_from_days(1, Δt_sec)
 
 # Calculate starting days
-start_days = round.(Int, range(0, 365, length = N_TRAJ + 1))[1:end-1]
+start_days = round.(Int, range(0, ROLLOUT_T, length = N_TRAJ + 1))[1:end-1]
 
 
 # Prepare container for metrics and heatmap data
-sums = (; (var => map(_ -> zeros(Float64, MAX_HORIZON), METRICS) for var in VARS)...)
+curves = (; (var => map(_ -> zeros(Float64, MAX_HORIZON, length(start_days)), METRICS) for var in VARS)...)
 kept = nothing
 
 
@@ -169,12 +170,12 @@ for (i,s) in enumerate(start_days)
 
         # Loop over variables
         for var in VARS
-            f = traj.[var][h + 1]                           # sampled trajectroy 
+            f = traj[var][h + 1]                            # sampled trajectroy 
             t = getfield(reference[s+h+1].grid, var)        # reference at day s+h
                 
             # Calculate metric and add to sums
             for (name, metric) in pairs(METRICS)
-                sums[var][name][h] += metric(f,t)
+                curves[var][name][h, i] = metric(f, t)
             end
         end
     end
@@ -185,15 +186,12 @@ for (i,s) in enumerate(start_days)
     end
 end
 
-# Calculate mean in respect to all starting days
-rollout_stats = map(metrics -> map(c -> c ./ length(start_days), metrics), sums)
-
 
 # Collet rollout results
 rollout = (;
     days            = 1:MAX_HORIZON,
     vars            = VARS,
-    curve           = rollout_stats,
+    curve           = curves,
     heatmap_days    = HEATMAP_DAYS,
     heatmap_states  = kept, 
 )
@@ -214,25 +212,32 @@ write_info(;
     path = folderpath, 
     file = "info.toml",
 
-    name         = NAME, 
-    created      = now(), 
-    julia        = string(VERSION),
-    sw           = string(pkgversion(SpeedyWeather)),
+    general = (;
+        name    = NAME,
+        created = now(),
+        julia   = string(VERSION),
+        sw_vers = string(pkgversion(SpeedyWeather)),
+    ),
 
-    trunc        = TRUNC, 
-    nlayers      = NLAYERS,
+    grid = (;
+        trunc   = TRUNC,
+        nlayers = NLAYERS,
+        grid_type   = string(nameof(SG.Grid)),
+    ),
 
-    model        = MODEL,
-    vars         = [string(v) for v in VARS],
+    rollout = (;
+        model        = nameof(MODEL),
+        vars         = [string(v) for v in VARS],
+        scheme       = scheme_name(SCHEME),
+        reference    = REFERENCE,
+        metrics      = [string(k) for k in keys(METRICS)],
+    ),
 
-    scheme       = scheme_name(SCHEME),
-    reference    = REFERENCE,
-
-    max_horizon  = MAX_HORIZON,
-    n_traj       = N_TRAJ,
-
-    metrics      = [string(k) for k in keys(METRICS)],
-
-    heatmap_days = HEATMAP_DAYS,
-    heatmap_traj = HEATMAP_TRAJ,
+    sampling = (;
+        max_horizon  = MAX_HORIZON,
+        n_traj       = N_TRAJ,
+        rollout_t    = ROLLOUT_T,
+        heatmap_days = HEATMAP_DAYS,
+        heatmap_traj = HEATMAP_TRAJ,
+    ),
 )
