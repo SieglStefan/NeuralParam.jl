@@ -23,10 +23,16 @@ SG = SpectralGrid(trunc=TRUNC, nlayers=NLAYERS)
 
 
 
+### Define standard values for AnalyticBandRadiation
+CO2 = 280f0         
+OCEAN_EM = 1f0      
+LAND_EM = 1f0
+
+
 ### Define common parameters for task selection
 # Schemes
 OBLW        = OneBandLongwave(SG; transmissivity = FriersonLongwaveTransmissivity(SG))
-ABR         = SpeedyExt.SpeedyAnalyticBandLongwave(SG)
+ABR         = SpeedyExt.SpeedyAnalyticBandLongwave(SG; CO₂ = CO2) 
 
 # References
 REF_OBLW    = "OBLW_default"
@@ -48,13 +54,13 @@ variants = [
 
     ### FreeRun OneBandLongwave (no longwave parameterization)
     # 1. Skill
-    (;  name            = "FreeRun_default_skill",
+    (;  name            = "FreeRunOBLW_default_skill",
         scheme          = nothing,
         reference       = REF_OBLW,
         SKILL...
     ),
     # 2. Stability
-    (;  name            = "FreeRun_default_stab",
+    (;  name            = "FreeRunOBLW_default_stab",
         scheme          = nothing,
         reference       = REF_OBLW,
         STAB...
@@ -90,6 +96,7 @@ variants = [
         STAB...
     ),
 
+
     ### Default NeuralLinearLW rollouts
     # 7. Skill
     (;  name            = "NLLW_default_skill",
@@ -103,6 +110,53 @@ variants = [
         reference       = REF_OBLW,
         STAB...
     ),
+
+
+
+    ### FreeRun AnalyticBandRadiation (no longwave parameterization)
+    # 9. Skill
+    (;  name            = "FreeRunABR_default_skill",
+        scheme          = nothing,
+        reference       = REF_ABR,
+        SKILL...
+    ),
+    # 10. Stability
+    (;  name            = "FreeRunABR_default_stab",
+        scheme          = nothing,
+        reference       = REF_ABR,
+        STAB...
+    ),
+
+    
+    ### Default AnalyticBandRadiation (for sanity test, should lead to zero error in evaluation)
+    # 11. Skill
+    (;  name            = "ABR_default_skill",
+        scheme          = ABR,
+        reference       = REF_ABR,
+        SKILL...
+    ),
+    # 12. Stability
+    (;  name            = "ABR_default_stab",
+        scheme          = ABR,
+        reference       = REF_ABR,
+        STAB...
+    ),
+
+
+    ### Default NeuralABRLW rollouts
+    # 13. Skill
+    (;  name            = "NABRLW_default_skill",
+        scheme          = "NABRLW_default",
+        reference       = REF_ABR,
+        SKILL...
+    ),
+    # 14. Stability
+    (;  name            = "NABRLW_default_stab",
+        scheme          = "NABRLW_default",
+        reference       = REF_ABR,
+        STAB...
+    ),
+    
 ]
 
 # Get task number and choose task
@@ -248,6 +302,12 @@ write_info(;
         trunc   = TRUNC,
         nlayers = NLAYERS,
         grid_type   = string(nameof(SG.Grid)),
+    ),
+
+    standard_values = (;
+        CO2         = CO2,
+        OCEAN_EM    = OCEAN_EM,
+        LAND_EM     = LAND_EM,
     ),
 
     rollout = (;

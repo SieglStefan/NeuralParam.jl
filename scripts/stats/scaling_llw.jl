@@ -35,7 +35,7 @@ nlayers = size(sc_a, 1)
 ### Store statistics
 # Create folder
 foldername = "scaling_llw_$(NAME)"
-folderpath = prepare_out_dir(stats_dir(), foldername)
+folderpath = fresh_out_dir(stats_dir(), foldername)
 
 # Save stats
 NeuralParam.save((sc_a=sc_a, sc_b=sc_b); path=folderpath, file="stats.jld2")
@@ -79,11 +79,14 @@ ax_a = Axis(
     ylabel = "Layer",
     title = "Global scaling parameter a",
     yticks = layers,
+    xticks = LinearTicks(3),
     yreversed = true,
 )
 
 CairoMakie.lines!(ax_a, sc_a, layers)
 CairoMakie.scatter!(ax_a, sc_a, layers)
+CairoMakie.vlines!(ax_a, [0]; color = :gray, linestyle = :dash)
+CairoMakie.vlines!(ax_a, [5f-8]; color = :red, linestyle = :dash)
 
 # Parameter b
 ax_b = Axis(
@@ -92,11 +95,14 @@ ax_b = Axis(
     ylabel = "Layer",
     title = "Global scaling parameter b",
     yticks = layers,
+    xticks = LinearTicks(3),
     yreversed = true,
 )
 
 CairoMakie.lines!(ax_b, sc_b, layers)
 CairoMakie.scatter!(ax_b, sc_b, layers)
+CairoMakie.vlines!(ax_b, [0]; color = :gray, linestyle = :dash)
+CairoMakie.vlines!(ax_b, [5f-6]; color = :red, linestyle = :dash)
 
 # Display plot
 display(fig)

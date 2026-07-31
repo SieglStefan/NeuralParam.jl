@@ -42,15 +42,11 @@ SG = SpectralGrid(trunc=TRUNC, nlayers=NLAYERS)
 ### Define parameters for sampling
 # General
 NAME        = "default"             # name of statistics
-SEED        = 1234                    # seed used    
-
-# Model and scheme
-MODEL       = PrimitiveWetModel                                 # used model
-LW_SCHEME   = SpeedyExt.SpeedyAnalyticBandLongwave(SG)          # used LW scheme
+SEED        = 1234                  # seed used    
 
 # Sampling
-T_SPINUP    = Day(30)                    # spinup time in days
-START_DATE  = DateTime(2000, 1, 1)      # start date of simulation
+T_SPINUP    = Day(30)               # spinup time in days
+START_DATE  = DateTime(2000, 1, 1)  # start date of simulation
 N_IC        = 2                     # number of initial conditions
 SIM_TIME    = 365                   # sampling time in days
 SAMPLE_GAP  = 3.65                  # days between sampling
@@ -64,6 +60,9 @@ CO2 = 280f0           # default CO2 value
 OCEAN_EM = 1f0        # default ocean emissivity value (SW does not propagate yet)
 LAND_EM = 1f0         # default land emissivity value (SW does not propagate yet)
 
+# Model and scheme
+MODEL       = PrimitiveWetModel                                 # used model
+LW_SCHEME   = SpeedyExt.SpeedyAnalyticBandLongwave(SG; CO₂ = CO2)          # used LW scheme
 
 
 ### Prepare simulation
@@ -337,6 +336,12 @@ write_info(;
             olw_mean        = olw_mean,         olw_std      = olw_std,
             slwd_mean       = slwd_mean,        slwd_std     = slwd_std,
         ),
+    ),
+
+    standard_values = (;
+        CO2         = CO2,
+        OCEAN_EM    = OCEAN_EM,
+        LAND_EM     = LAND_EM,
     ),
 
     grid = (;
