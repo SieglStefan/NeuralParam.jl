@@ -1,58 +1,44 @@
-### Metrics and norm utilities
+### Metrics utilities
 ###
-### XXX Helper functions for evaluation data
+### Different metrics and norms for evaluating model performance, training loss and gradients
 
 
-
-# Mean squared error
-function mse(x, y)
-    return sum(abs2, (y .- x)) / length(x)
-end
 
 # Root mean squared error
-function rmse(x, y)
-    return sqrt(mse(x, y))
-end
-
-# Normalized mean squared error
-function norm_mse(x, y, std)
-    return sum(abs2, (x .- y) ./ std) / length(x)
-end
-
-
+rmse(x, y) = sqrt(sum(abs2, x .- y) / length(x))
 # Bias
-function bias(x, y)
-    return sum(y .- x) / length(x)
-end
+bias(x, y) = sum(y .- x) / length(x)
+
+# Weighted metrics
+wmean(x, w) = sum(w .* x) / length(x)
+wrmse(x, y, w) = sqrt(wmean(abs2.(x .- y), w))
+wbias(x, y, w) = wmean(x .- y, w)
+
 
 # Correlation
-function correlation(x, y)
-    return cor(vec(x), vec(y))
-end
-
+correlation(x, y) = cor(vec(x), vec(y))
 # Maximal absolute difference
-function maxdiff(x, y)
-    return maximum(abs.(y .- x))
-end
+maxdiff(x, y) = maximum(abs.(y .- x))
 
 
 
 # Recursive squared L2 norms
-tree_l2sum(x::Number) = abs2(x)
-tree_l2sum(x::AbstractArray) = sum(abs2, x)
-tree_l2sum(x::Tuple) = sum(tree_l2sum, x)
-tree_l2sum(x::NamedTuple) = sum(tree_l2sum, values(x))
+tree_l2sum(x::Number)           = abs2(x)
+tree_l2sum(x::AbstractArray)    = sum(abs2, x)
+tree_l2sum(x::Tuple)            = sum(tree_l2sum, x)
+tree_l2sum(x::NamedTuple)       = sum(tree_l2sum, values(x))
 
 # Recursive L2 norm for parameter/gradient trees
 tree_l2norm(x) = sqrt(tree_l2sum(x))
 
 
-
-tree_add(a::Number, b::Number)               = a + b
+# Utility functions for adding parameter/gradient trees
+tree_add(a::Number, b::Number)                = a + b
 tree_add(a::AbstractArray, b::AbstractArray)  = a .+ b
 tree_add(a::Tuple, b::Tuple)                  = map(tree_add, a, b)
 tree_add(a::NamedTuple, b::NamedTuple)        = map(tree_add, a, b)
 
+# Utility functions for scaling parameter/gradient trees
 tree_scale(a::Number, s)        = a * s
 tree_scale(a::AbstractArray, s) = a .* s
 tree_scale(a::Tuple, s)         = map(x -> tree_scale(x, s), a)

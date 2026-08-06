@@ -1,6 +1,6 @@
 ### Script for generating reference data for evaluation/testing
 ###
-### Objective: Propagate a specific model and save whole state every day for 2 years
+### Objective: Propagate a specific model and save its state every day for 2 years
 
 
 
@@ -8,9 +8,6 @@
 using Revise
 using NeuralParam
 using SpeedyWeather
-using AnalyticBandRadiation
-SpeedyExt = Base.get_extension(AnalyticBandRadiation,
-                                :AnalyticBandRadiationSpeedyWeatherExt)
 using Dates
 using Random
 
@@ -31,9 +28,6 @@ variants = [
 
     # 1. OneBandLongwave default
     (; name="OBLW_default", lw_scheme=OneBandLongwave(SG; transmissivity = FriersonLongwaveTransmissivity(SG))),
-
-    # 2. AnalyticBandRadiation default
-    (; name="ABR_default", lw_scheme=SpeedyExt.SpeedyAnalyticBandLongwave(SG)),
 ]
 
 # Get task number and choose task
@@ -55,6 +49,7 @@ LW_SCHEME  = get(v, :lw_scheme, nothing)        # used longwave radiation scheme
 T_SPINUP   = get(v, :t_spinup, Day(30))                     # spinup time in days
 START_DATE = get(v, :start_date, DateTime(2001, 1, 1))      # sampling starting date
 SIM_DAYS   = get(v, :sim_days, 2*365)                       # sampling time in days
+FULL_GAP   = get(v, :full_gap, 1)                           # store a full (restart) state every FULL_GAP days
 
 # Perturbation
 FAC_PERT_T = get(v, :fac_pert_t, 2f0)           # additive perturbation amplitude for temperature
@@ -62,74 +57,33 @@ FAC_PERT_Q = get(v, :fac_pert_q, 0.2f0)         # multiplicative perturbation am
 
 
 
-### Prepare simulation
-# Set seed for reproducability
-Random.seed!(SEED)
-
-# Define model and initialize simulation
-model = MODEL(SG; longwave_radiation = LW_SCHEME)
-sim = initialize!(model)
-
-
-# Set starting time for spinup
-clock_start = START_DATE - T_SPINUP
-SpeedyWeather.set!(sim.variables.prognostic.clock; time = clock_start, start = clock_start)
-
-# Perturb grid fields
-perturb_grid_field!(sim, :temperature; fac_add  = FAC_PERT_T)
-perturb_grid_field!(sim, :humidity;    fac_mult = FAC_PERT_Q, zeromin = true)
-
-# Spinup simulation
-run!(sim, period = T_SPINUP)
-
-# Extract time-step time and calculate necessary steps for one day
-(; Δt_sec) = sim.model.time_stepping
-steps_per_day = steps_from_days(1, Δt_sec)
-
-# Initialize simulation and perform a first timestep
-SpeedyWeather.initialize!(sim, steps = SIM_DAYS * steps_per_day + 1)
-SpeedyWeather.first_timesteps!(sim)
+### Prepare generation
+# Create output folder
+DIR = prepare_out_dir(reference_dir(), NAME)
 
 
 
-### Save reference data
-# Create folder
-foldername = "$(NAME)"
-folderpath = prepare_out_dir(reference_dir(), foldername)
-
-
-
-### Start data sampling
-save_store(; path=folderpath, file="reference.jld2") do store
-
-    # Save the initial state (day 0)
-    store["day_0/full"] = sim.variables
-    store["day_0/grid"] = sim.variables.grid
-
-    # Loop over the whole simulation
-    for day in 1:SIM_DAYS
-
-        # Propagate simulation for one day
-        for _ in 1:steps_per_day
-            SpeedyWeather.later_timestep!(sim)
-        end
-
-        # Save state
-        store["day_$(day)/full"] = sim.variables
-        store["day_$(day)/grid"] = sim.variables.grid
-    end
-
-    # Written last: its presence marks the file as complete
-    store["sim_days"] = SIM_DAYS
-end
-
-@info "Reference dataset stored at $(folderpath)!"
+### Generate the reference data set
+ref = generate_reference(
+    SG;
+    name        = NAME,
+    dir         = DIR,
+    seed        = SEED,
+    model       = MODEL,
+    lw_scheme   = LW_SCHEME,
+    t_spinup    = T_SPINUP,
+    start_date  = START_DATE,
+    sim_days    = SIM_DAYS,
+    full_gap    = FULL_GAP,
+    fac_pert_T  = FAC_PERT_T,
+    fac_pert_q  = FAC_PERT_Q,
+)
 
 
 
 ### Create and store info.toml file
-write_info(; 
-    path = folderpath, 
+write_info(;
+    dir = DIR,
     file = "info.toml",
 
     general = (;
@@ -139,7 +93,7 @@ write_info(;
         julia   = string(VERSION),
         sw_vers = string(pkgversion(SpeedyWeather)),
     ),
-    
+
     grid = (;
         trunc   = TRUNC,
         nlayers = NLAYERS,
@@ -147,14 +101,16 @@ write_info(;
     ),
 
     model_type = (;
-        model       = nameof(MODEL),
-        lw_scheme   = nameof(typeof(LW_SCHEME)),
+        model       = string(nameof(MODEL)),
+        lw_scheme   = string(nameof(typeof(LW_SCHEME))),
     ),
-    
+
     sampling = (;
-        t_spinup    = string(T_SPINUP),
-        start_date  = string(START_DATE),
-        sim_days    = SIM_DAYS,
+        t_spinup      = string(T_SPINUP),
+        start_date    = string(START_DATE),
+        sim_days      = SIM_DAYS,
+        full_gap      = FULL_GAP,
+        steps_per_day = ref.steps_per_day,
     ),
 
     perturbation = (;
@@ -162,4 +118,3 @@ write_info(;
         fac_pert_q = FAC_PERT_Q,
     ),
 )
-

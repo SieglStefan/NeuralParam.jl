@@ -1,0 +1,36 @@
+[general]
+created = 2026-08-05T00:11:30.475Z
+julia = "1.10.11"
+name = "layer_4"
+seed = 1234
+sw_vers = "0.21.1+DEV"
+
+[grid]
+grid_type = "OctahedralGaussianGrid"
+nlayers = 8
+trunc = 31
+
+[io]
+direct = ["dT", "olw", "slwd"]
+forms = ["dT = a*T + b", "olw = c + d*T[1] + e*Ts", "slwd = f + g*T[nlayers]"]
+inputs = ["T", "q", "p", "lat", "lf", "sst", "lst", "Ts"]
+linear = ["a", "b", "c", "d", "e", "f", "g"]
+
+[model_type]
+emissivity_land = 0.9800000190734863
+emissivity_ocean = 0.9800000190734863
+lw_scheme = "OneBandLongwave"
+model = "PrimitiveWetModel"
+transmissivity = "FriersonLongwaveTransmissivity"
+
+[perturbation]
+fac_pert_q = 0.20000000298023224
+fac_pert_t = 2.0
+
+[sampling]
+n_ic = 1
+n_sub = 200
+sample_gap = 3.65
+sim_time = 365
+start_date = "2000-01-01T00:00:00"
+t_spinup = "30 days"

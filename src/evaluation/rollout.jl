@@ -1,26 +1,39 @@
 ### Functions for skill and rollout evaluation
 ###
-### XXX
+### Evaluates rollouts of trained schemes and compares them to reference data sets, including skill scores and heatmaps of fields
 
 
 
-# Reduce one curve over trajectories: MAX_HORIZON × N_TRAJ -> vector
-rollout_curve(r, var, metric; f = mean) = vec(f(r.curve[var][metric]; dims = 2))
+# Reduce the column dimension of one metric: rmse combines in quadrature, everything else averages
+reduce_cols(a, metric) = metric === :rmse ? sqrt.(mean(abs2, a; dims = 3)) : mean(a; dims = 3)
+
+# Reduce one curve over trajectories: (day, traj, col) -> vector over lead days
+#   - layer = nothing reduces all column entries, an integer picks one vertical layer
+function rollout_curve(r, probe, metric; layer = nothing, f = mean)
+
+    # Pick the metric and reduce the column dimension
+    a = r.err[probe][metric]
+    a = isnothing(layer) ? reduce_cols(a, metric) : a[:, :, layer:layer]
+
+    # Reduce over trajectories
+    return vec(f(dropdims(a; dims = 3); dims = 2))
+end
 
 
-function plot_rollout(; rollouts::NamedTuple, vars, metrics, ribbon = true, kwargs...)
+# Plot rollout curves of multiple schemes, one panel per probed field and metric
+function plot_rollout(; rollouts::NamedTuple, probes, metrics, layer = nothing, ribbon = true, kwargs...)
 
     panels = []
 
-    # One panel per variable and metric
-    for var in vars, metric in metrics
+    # One panel per probed field and metric
+    for probe in probes, metric in metrics
         p = Plots.plot(; xlabel = "forecast horizon [days]",
-                         ylabel = "$(var) $(metric)", legend = :topleft)
+                         ylabel = "$(probe) $(metric)", legend = :topleft)
 
         # One line per scheme
         for (name, r) in pairs(rollouts)
-            rib = ribbon ? rollout_curve(r, var, metric; f = std) : nothing
-            Plots.plot!(p, collect(r.days), rollout_curve(r, var, metric);
+            rib = ribbon ? rollout_curve(r, probe, metric; layer, f = std) : nothing
+            Plots.plot!(p, collect(r.days), rollout_curve(r, probe, metric; layer);
                         label = String(name), lw = 2, ribbon = rib, fillalpha = 0.15)
         end
 
@@ -28,8 +41,8 @@ function plot_rollout(; rollouts::NamedTuple, vars, metrics, ribbon = true, kwar
     end
 
     return Plots.plot(panels...;
-        layout = (length(vars), length(metrics)),
-        size   = (500 * length(metrics), 350 * length(vars)),
+        layout = (length(probes), length(metrics)),
+        size   = (500 * length(metrics), 350 * length(probes)),
         kwargs...)
 end
 
@@ -43,8 +56,6 @@ sym_range(fields) = (m = maximum(maximum(abs, vec(f)) for f in fields); (-m, m))
 
 
 ### Heatmaps of all rollouts, one figure per heatmap day
-### ref = nothing -> absolute fields (is the structure preserved?)
-### ref = :Name   -> difference to that rollout (where do the schemes differ?)
 function plot_rollout_heatmaps(;
     rollouts::NamedTuple,
     var::Symbol = :temperature,

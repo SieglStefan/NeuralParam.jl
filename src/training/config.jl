@@ -8,20 +8,22 @@
 
 # Struct holding training run configuration parameters
 @kwdef struct RunConfig
-    seed::Int = 1234                    # seed for RNG
+    seed::Int = 1234                                    # seed for RNG
+    name::String = "default"                            # name of the training run
+    dir::String = "default"                             # directory for storing training runs
     
-    model::Type = PrimitiveWetModel     # model used for training
-    lw_scheme::Union{Nothing, SpeedyWeather.AbstractLongwave} = nothing     # target LW scheme
+    model::Type = PrimitiveWetModel                                         # model used for training
+    lw_target::Union{Nothing, SpeedyWeather.AbstractLongwave} = nothing     # target LW scheme
 
-    eta0::Float32 = 1f-2                # initial learning rate       
-    eta_decay::Float32 = 0.8f0          # learning rate decay after an ic         
+    eta0::Float32 = 1f-2                                # initial learning rate
+    eta_decay::Float32 = 0.8f0                          # learning rate decay after an ic
+    loss_config::Union{Nothing, LossConfig} = nothing   # weighting and normalization of the loss
 
-    t_spinup = Day(30)                  # spinup time before training
-    start_date = DateTime(2000, 1, 1)   # start date of simulation
+    t_spinup::Period = Day(30)                          # spinup time before training
+    start_date::DateTime = DateTime(2000, 1, 1)         # start date of simulation
 
     n_ic::Int = 5                       # nr. of ic used for training
     n_traj::Int = 100                   # nr. of trajectroies per ic u.f.t.
-    n_epochs::Int = 1                   # nr. of epochs per trajectory u.f.t.
     n_batch::Int = 4                    # batch size for training
     n_steps_0::Int = 5                  # nr. of initial training steps per update
     n_steps_inc::Int = 2                # increase of n_steps after an ic
@@ -31,40 +33,4 @@
     fac_pert_q::Float32 = 0.2f0         # multiplicative perturbation factor for humidity
 
     do_autodiff::Bool = true            # whether to use autodiff for training
-end
-
-
-# Convenience constructor for a test run
-function RunConfig(::Val{:test})
-    
-    return RunConfig(
-        t_spinup = Day(1),
-        n_ic = 1,
-        n_traj = 4,
-        n_epochs = 2,
-        n_batch = 2,
-        n_steps_0 = 1,
-        n_steps_inc = 1,
-        n_gap = 1,
-    )
-end
-
-
-
-# Struct holding training output parameters
-@kwdef struct OutputConfig
-    printing_ic::Bool = true                        # print training info after every completed ic
-    printing_traj::Bool = false                     # print -//- after every completed trajectory
-    printing_epochs::Bool = false                   # print -//- after every completed epoch
-
-    output_path::Union{Nothing,String} = nothing    # training output saving folder
-
-    train_save::Bool = true                         # save training information in a .csv
-    train_file::String = "training.csv"             # file name
-
-    scheme_save::Bool = true                        # save parameterization scheme after training
-    scheme_file::String = "scheme.jld2"             # scheme file name
-
-    plots_save::Bool = true                         # saves training plots after every ic
-    plots_folder::String = "train_plots"            # folder where trainings plots are stored
 end

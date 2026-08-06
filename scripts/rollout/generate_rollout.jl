@@ -1,6 +1,7 @@
 ### Script for generating rollouts for evaluation
 ###
-### Objective: Propagate a specific model for certain horizons over a year and save states
+### Objective: Propagate a specific scheme for certain horizons over a year and reduce it
+###            against a reference data set
 
 
 
@@ -8,9 +9,6 @@
 using Revise
 using NeuralParam
 using SpeedyWeather
-using AnalyticBandRadiation
-SpeedyExt = Base.get_extension(AnalyticBandRadiation,
-                                :AnalyticBandRadiationSpeedyWeatherExt)
 using Dates
 using Random
 
@@ -23,25 +21,25 @@ SG = SpectralGrid(trunc=TRUNC, nlayers=NLAYERS)
 
 
 
-### Define standard values for AnalyticBandRadiation
-CO2 = 280f0         
-OCEAN_EM = 1f0      
-LAND_EM = 1f0
-
-
 ### Define common parameters for task selection
+# Surface emissivity
+EM_OCEAN    = 0.98f0
+EM_LAND     = 0.98f0
+
 # Schemes
-OBLW        = OneBandLongwave(SG; transmissivity = FriersonLongwaveTransmissivity(SG))
-ABR         = SpeedyExt.SpeedyAnalyticBandLongwave(SG; CO₂ = CO2) 
+OBLW        = OneBandLongwave(SG;
+    transmissivity     = FriersonLongwaveTransmissivity(SG),
+    radiative_transfer = OneBandLongwaveRadiativeTransfer(SG;
+                            emissivity_ocean = EM_OCEAN,
+                            emissivity_land  = EM_LAND),
+)
 
 # References
 REF_OBLW    = "OBLW_default"
-REF_ABR     = "ABR_default"
 
-# Trajectory
+# Trajectory protocols
 SKILL       = (; max_horizon = 31,  n_traj = 52, heatmap_days = [1,3,7,14])
 STAB        = (; max_horizon = 180, n_traj = 4,  heatmap_days = [1,30,90,180])
-
 
 
 
@@ -66,7 +64,7 @@ variants = [
         STAB...
     ),
 
-    
+
     ### Default OneBandLongwave (for sanity test, should lead to zero error in evaluation)
     # 3. Skill
     (;  name            = "OBLW_default_skill",
@@ -82,22 +80,22 @@ variants = [
     ),
 
 
-    ### Default ConstLinearLW rollouts
+    ### Default ConstLW rollouts
     # 5. Skill
-    (;  name            = "CLLW_default_skill",
-        scheme          = "CLLW_default",
+    (;  name            = "CLLW_default_linear_skill",
+        scheme          = "CLLW_default_linear",
         reference       = REF_OBLW,
         SKILL...
     ),
     # 6. Stability
-    (;  name            = "CLLW_default_stab",
-        scheme          = "CLLW_default",
+    (;  name            = "CLLW_default_linear_stab",
+        scheme          = "CLLW_default_linear",
         reference       = REF_OBLW,
         STAB...
     ),
 
 
-    ### Default NeuralLinearLW rollouts
+    ### Default NeuralLW rollouts
     # 7. Skill
     (;  name            = "NLLW_default_skill",
         scheme          = "NLLW_default",
@@ -110,53 +108,6 @@ variants = [
         reference       = REF_OBLW,
         STAB...
     ),
-
-
-
-    ### FreeRun AnalyticBandRadiation (no longwave parameterization)
-    # 9. Skill
-    (;  name            = "FreeRunABR_default_skill",
-        scheme          = nothing,
-        reference       = REF_ABR,
-        SKILL...
-    ),
-    # 10. Stability
-    (;  name            = "FreeRunABR_default_stab",
-        scheme          = nothing,
-        reference       = REF_ABR,
-        STAB...
-    ),
-
-    
-    ### Default AnalyticBandRadiation (for sanity test, should lead to zero error in evaluation)
-    # 11. Skill
-    (;  name            = "ABR_default_skill",
-        scheme          = ABR,
-        reference       = REF_ABR,
-        SKILL...
-    ),
-    # 12. Stability
-    (;  name            = "ABR_default_stab",
-        scheme          = ABR,
-        reference       = REF_ABR,
-        STAB...
-    ),
-
-
-    ### Default NeuralABRLW rollouts
-    # 13. Skill
-    (;  name            = "NABRLW_default_skill",
-        scheme          = "NABRLW_default",
-        reference       = REF_ABR,
-        SKILL...
-    ),
-    # 14. Stability
-    (;  name            = "NABRLW_default_stab",
-        scheme          = "NABRLW_default",
-        reference       = REF_ABR,
-        STAB...
-    ),
-    
 ]
 
 # Get task number and choose task
@@ -167,128 +118,54 @@ v = variants[task+1]
 
 ### Define and extract parameters
 # General
-NAME         = get(v, :name, "NoName_default")      # name of the rollout
+NAME         = get(v, :name, "NoName_default")          # name of the rollout
 
 # Scheme and reference
-SCHEME       = get(v, :scheme, "CLLW_default")      # scheme to
-REFERENCE    = get(v, :reference, "OBLW_default")   # reference for comparison
+SCHEME       = get(v, :scheme, "CLLW_default_linear")   # scheme to roll out
+REFERENCE    = get(v, :reference, REF_OBLW)             # reference for comparison
 
 # Model
-MODEL        = get(v, :model, PrimitiveWetModel)    # used model
-VARS         = get(v, :vars, (:temperature,))       # sampled variables
+MODEL        = get(v, :model, PrimitiveWetModel)        # used model
+PROBED       = get(v, :probes, PROBES)                  # probed fields
 
 # Rollout
-MAX_HORIZON  = get(v, :max_horizon, 31)             # maximum forecast length in days
-N_TRAJ       = get(v, :n_traj, 52)                  # number of trajectories sampled
-ROLLOUT_T    = get(v, :rollout_t, 365)              # sampling time of rollout
-
-# Metrics
-METRICS      = get(v, :metrics, (; rmse, bias))     # metrics to be calculated
+MAX_HORIZON  = get(v, :max_horizon, 31)                 # maximum forecast length in days
+N_TRAJ       = get(v, :n_traj, 52)                      # number of trajectories sampled
+ROLLOUT_T    = get(v, :rollout_t, 365)                  # sampling time of rollout
 
 # Heatmaps
-HEATMAP_DAYS = get(v, :heatmap_days, [1,7,31])      # days for which entire temperature fields are returned
-HEATMAP_TRAJ = get(v, :heatmap_traj, 1)             # choice of specific trajectory for heatmap
+HEATMAP_DAYS = get(v, :heatmap_days, [1,7,31])          # lead days for which entire fields are returned
+HEATMAP_TRAJ = get(v, :heatmap_traj, 1)                 # choice of specific trajectory for heatmap
 
 
 
-### Load to be rolled out scheme and reference
-scheme = resolve_scheme(SCHEME)
+### Prepare generation
+# Create output folder
+DIR = fresh_out_dir(rollout_dir(), NAME)
 
 
 
-### Compute and save reduced diagnostics
-# Extract time stepping
-Δt_sec = initialize!(MODEL(SG; longwave_radiation = scheme)).model.time_stepping.Δt_sec
-
-# Calculate number of steps for one day
-n_steps_day = steps_from_days(1, Δt_sec)
-
-# Calculate starting days
-start_days = round.(Int, range(0, ROLLOUT_T, length = N_TRAJ + 1))[1:end-1]
-
-
-# Prepare container for metrics and heatmap data
-curves = (; (var => map(_ -> zeros(Float64, MAX_HORIZON, length(start_days)), METRICS) for var in VARS)...)
-
-
-# Loop over all starting days in a year e.g.: (0,7,14,...,350,364)
-kept = with_reference(REFERENCE) do ref
-
-    # Check the reference covers the whole rollout
-    n_needed = maximum(start_days) + MAX_HORIZON
-    ref.sim_days ≥ n_needed || error(
-        "Reference '$REFERENCE' covers $(ref.sim_days) days, need $n_needed " *
-        "(rollout_t = $ROLLOUT_T, max_horizon = $MAX_HORIZON, n_traj = $N_TRAJ)."
-    )
-
-    # Container for the heatmap states of one trajectory
-    heatmaps = nothing
-
-    for (i, s) in enumerate(start_days)
-
-        # Initialize simulation
-        sim = initialize!(MODEL(SG; longwave_radiation = scheme))
-
-        # Sample trajectory
-        traj = sample_grid_trajectory(
-            sim,
-            VARS,
-            ref[s];
-            n_steps = MAX_HORIZON * n_steps_day,
-            n_gap = n_steps_day
-        )
-
-        # Throw error if variable not available
-        isnothing(traj) && error("Trajectory sampling failed: VARS = $VARS not available in $(MODEL).")
-
-        # Loop over horizons
-        for h in 1:MAX_HORIZON
-
-            # Loop over variables
-            for var in VARS
-                f = traj[var][h + 1]                        # sampled trajectory at day h
-                t = getfield(grid_state(ref, s + h), var)   # reference at day s+h
-
-                # Calculate metrics
-                for (name, metric) in pairs(METRICS)
-                    curves[var][name][h, i] = metric(f, t)
-                end
-            end
-        end
-
-        # Filter specific heatmap days
-        if i == HEATMAP_TRAJ
-            heatmaps = (; (var => [traj[var][d+1] for d in HEATMAP_DAYS] for var in VARS)...)
-        end
-    end
-
-    return heatmaps
-end
-
-
-# Collet rollout results
-rollout = (;
-    days            = 1:MAX_HORIZON,
-    vars            = VARS,
-    curve           = curves,
-    heatmap_days    = HEATMAP_DAYS,
-    heatmap_states  = kept, 
+### Generate the rollout
+rollout = generate_rollout(
+    SG;
+    name         = NAME,
+    dir          = DIR,
+    scheme       = SCHEME,
+    reference    = REFERENCE,
+    model        = MODEL,
+    probes       = PROBED,
+    max_horizon  = MAX_HORIZON,
+    n_traj       = N_TRAJ,
+    rollout_t    = ROLLOUT_T,
+    heatmap_days = HEATMAP_DAYS,
+    heatmap_traj = HEATMAP_TRAJ,
 )
 
 
 
-### Save reduced rollout
-# Create folder
-foldername = "$(NAME)"
-folderpath = fresh_out_dir(rollout_dir(), foldername)
-
-# Save rollout
-NeuralParam.save(rollout; path=folderpath, file="rollout.jld2")
-@info "Rollout dataset stored at $(folderpath)!"
-
-# Create and store info.toml file
-write_info(; 
-    path = folderpath, 
+### Create and store info.toml file
+write_info(;
+    dir = DIR,
     file = "info.toml",
 
     general = (;
@@ -304,24 +181,19 @@ write_info(;
         grid_type   = string(nameof(SG.Grid)),
     ),
 
-    standard_values = (;
-        CO2         = CO2,
-        OCEAN_EM    = OCEAN_EM,
-        LAND_EM     = LAND_EM,
-    ),
-
     rollout = (;
-        model        = nameof(MODEL),
-        vars         = [string(v) for v in VARS],
+        model        = string(nameof(MODEL)),
         scheme       = scheme_name(SCHEME),
         reference    = REFERENCE,
-        metrics      = [string(k) for k in keys(METRICS)],
+        probes       = [string(p) for p in keys(PROBED)],
+        metrics      = ["rmse", "bias"],
     ),
 
     sampling = (;
         max_horizon  = MAX_HORIZON,
         n_traj       = N_TRAJ,
         rollout_t    = ROLLOUT_T,
+        start_days   = rollout.start_days,
         heatmap_days = HEATMAP_DAYS,
         heatmap_traj = HEATMAP_TRAJ,
     ),

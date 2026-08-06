@@ -1,3 +1,13 @@
+### Plotting of training runs
+###
+### Functions for plotting training data
+###     - plot_loss:            simple loss plot over training steps
+###     - plot_training:        plots loss and also parameter- and gradient norm over training steps
+###     - plot_training_comp:   plots loss comparison of two training runs
+###     - plot_metrics:         plots per-component metrics from a training .csv file
+
+
+
 # Plot timeseries of loss of a training run
 function plot_loss(loss::AbstractVector; kwargs...)
 
@@ -13,10 +23,10 @@ function plot_loss(loss::AbstractVector; kwargs...)
 end
 
 # Plot timeseries of loss of a training run from .csv file
-function plot_loss(; path="", file="", kwargs...)
+function plot_loss(; dir="", file="", kwargs...)
     
     # Read and extract data
-    df = csv_read(;path, file)
+    df = csv_read(;dir, file)
     loss = df.loss
     
     return plot_loss(loss; kwargs...)
@@ -35,7 +45,6 @@ function plot_training(
     gnorm_kwargs = (;),
     plot_kwargs = (;),
 )
-
 
     # Mean over consecutive blocks of n_batch steps, and their x-positions
     bmean(v) = [Statistics.mean(@view v[i:min(i+n_batch-1, lastindex(v))]) for i in 1:n_batch:length(v)]
@@ -56,7 +65,6 @@ function plot_training(
     p2 = Plots.plot(
         pnorm;
         ylabel = "Parameter norm",
-        yscale = :log10,
         legend = false,  
         pnorm_kwargs...,
     )
@@ -71,7 +79,7 @@ function plot_training(
         legend = false,  
         gnorm_kwargs...,
     )
-     Plots.plot!(p3, xb, bmean(gnorm); label = "batch mean", lw = 2, color = :black)
+    Plots.plot!(p3, xb, bmean(gnorm); label = "batch mean", lw = 2, color = :black)
 
     defaults = (; size = (600, 900), left_margin = 8Plots.mm)
     merged = merge(defaults, plot_kwargs)
@@ -80,12 +88,12 @@ function plot_training(
 end
 
 # Plot timeseries of loss, parameter- and gradient norm of a training run from file
-function plot_training(; path="", file="", n_batch, kwargs...)
+function plot_training(; dir="", file="", n_batch, kwargs...)
     
     # Read and extract data
-    df = csv_read(;path, file)
+    df = csv_read(;dir, file)
 
-    loss = df.loss
+    loss = df.loss_total
     pnorm = df.pnorm
     gnorm = df.gnorm
     
@@ -118,7 +126,7 @@ end
 function plot_training_comp(runs::AbstractVector{<:Tuple}; labels=nothing, kwargs...)
 
     # Read and extract data
-    losses = [csv_read(; path=p, file=f).loss for (p,f) in runs]
+    losses = [csv_read(; dir=p, file=f).loss for (p,f) in runs]
     labs = isnothing(labels) ? [f for (_,f) in runs] : labels
 
     return plot_training_comp(losses; labels=labs, kwargs...)
@@ -126,33 +134,66 @@ end
 
 
 
-# Plot per-component metrics from a training .csv:
-function plot_metrics(; path="", file="", fraction=1.0, kwargs...)
-    df = csv_read(; path, file)
+# Plot normalized metrics of a training run: losses, normalized rmse and bias
+function plot_metrics_norm(; dir="", file="", weights=nothing, kwargs...)
 
-    # keep only the last `fraction` of rows (at least 1), preserving original step numbers
-    n  = nrow(df)
-    k  = max(1, round(Int, n * clamp(fraction, 0, 1)))
-    i0 = n - k + 1
-    df   = df[i0:n, :]
-    step = i0:n                      # original step numbers on the x-axis, not 1-based
+    df = csv_read(; dir, file)
 
-    comps = [c[6:end] for c in names(df) if startswith(c, "rmse_")]
-    isempty(comps) && error("No rmse_* metric columns found in $(joinpath(path, file)).")
+    # Weights are not stored in the .csv, so they have to be passed in
+    w    = isnothing(weights) ? (; T = 1, olw = 1, slwd = 1) : weights
+    wlab = isnothing(weights) ? "unweighted" : "weighted"
 
-    panels = []
-    for comp in comps
-        push!(panels, Plots.plot(step, df[!, "rmse_"*comp];
-            ylabel = "RMSE ($comp)", yscale = :log10, lw = 2, legend = false))
-        pb = Plots.plot(step, df[!, "bias_"*comp];
-            ylabel = "bias ($comp)", lw = 2, legend = false)
-        Plots.hline!(pb, [0]; color = :black, ls = :dash, lw = 1, label = "")
-        push!(panels, pb)
-    end
 
-    Plots.xlabel!(panels[end-1], "Training step")
-    Plots.xlabel!(panels[end],   "Training step")
+    # Losses: total and per-field contributions
+    p1 = Plots.plot(df.loss_total;
+        ylabel = "Loss", yscale = :log10, lw = 2, label = "total", color = :black)
+    Plots.plot!(p1, w.T    .* df.loss_T;    lw = 2, label = "T ($wlab)")
+    Plots.plot!(p1, w.olw  .* df.loss_olw;  lw = 2, label = "olw ($wlab)")
+    Plots.plot!(p1, w.slwd .* df.loss_slwd; lw = 2, label = "slwd ($wlab)")
 
-    return Plots.plot(panels...; layout = (length(comps), 2),
-                      plot_title = "Per-component metrics", kwargs...)
+    # Normalized rmse (in units of the field's std)
+    p2 = Plots.plot(df.nrmse_T;
+        ylabel = "norm. RMSE [σ]", yscale = :log10, lw = 2, label = "T")
+    Plots.plot!(p2, df.nrmse_olw;  lw = 2, label = "olw")
+    Plots.plot!(p2, df.nrmse_slwd; lw = 2, label = "slwd")
+
+    # Normalized bias (in units of the field's std)
+    p3 = Plots.plot(df.nbias_T;
+        xlabel = "Training step", ylabel = "norm. bias [σ]", lw = 2, label = "T")
+    Plots.plot!(p3, df.nbias_olw;  lw = 2, label = "olw")
+    Plots.plot!(p3, df.nbias_slwd; lw = 2, label = "slwd")
+    Plots.hline!(p3, [0]; color = :black, ls = :dash, lw = 1, label = "")
+
+
+    defaults = (; size = (700, 900), left_margin = 8Plots.mm)
+    merged   = merge(defaults, values(kwargs))
+
+    return Plots.plot(p1, p2, p3; layout = (3, 1), merged...)
+end
+
+
+
+# Plot raw metrics of a training run in physical units, grouped by unit
+function plot_metrics_raw(; dir="", file="", kwargs...)
+
+    df = csv_read(; dir, file)
+
+    # Temperature [K]
+    p1 = Plots.plot(df.rmse_T; ylabel = "T [K]", lw = 2, label = "RMSE")
+    Plots.plot!(p1, df.bias_T; lw = 2, label = "bias")
+    Plots.hline!(p1, [0]; color = :black, ls = :dash, lw = 1, label = "")
+
+    # Fluxes [W/m²] — same unit, so they share a panel
+    p2 = Plots.plot(df.rmse_olw;
+        xlabel = "Training step", ylabel = "Flux [W/m²]", lw = 2, label = "RMSE olw")
+    Plots.plot!(p2, df.bias_olw;  lw = 2, label = "bias olw")
+    Plots.plot!(p2, df.rmse_slwd; lw = 2, label = "RMSE slwd")
+    Plots.plot!(p2, df.bias_slwd; lw = 2, label = "bias slwd")
+    Plots.hline!(p2, [0]; color = :black, ls = :dash, lw = 1, label = "")
+
+
+    defaults = (; size = (700, 600), left_margin = 8Plots.mm)
+    merged   = merge(defaults, values(kwargs))
+
+    return Plots.plot(p1, p2; layout = (2, 1), merged...)
 end

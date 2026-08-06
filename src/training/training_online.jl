@@ -1,11 +1,13 @@
 ### Trains a parameterization online in SpeedyWeather.jl
 ###
-### XXX Algorithm:
+### Algorithm:
 ###     
-###     - Initialize containers, optimiser and training data saving
-###     - Initialize target and training simulation:        sim_target and sim_train
-###     - Create a template simulation for copying:         sim_template
-###     
+###     - Setup optimiser and simulations
+###             - template: sim used for copying before perturbation
+###             - target:   sim used as target for gradient computation
+###             - train:    sim of to be trained lw scheme
+###     - Prepare containers and logging/saving 
+###
 ###     - Loop over initial conditions: n_ic
 ###         - Copy sim_template and perturb it:             sim_pert
 ###         - Spinup sim_pert
@@ -13,14 +15,11 @@
 ###
 ###         - Loop over trajectories: n_traj
 ###             - Copy sim_ref onto sim_target and sim_train
-###             - Propagate sim_target for n_steps steps
-###
-###             - Loop over epochs: n_epochs
-###                 - Update radiation scheme parameters
-###                 - Propagate sim_train for n_steps
-###                 - Calculate gradients
-###                 - Store training data
-###
+###             - Propagate sim_target and sim_train for n_steps
+###             - Calculate loss and gradients
+###             - Accumulate gradients over batch window
+###             - (Update optimiser and scheme after batch window)
+###             - Store training data
 ###             - Propagate sim_ref for n_gap steps
 ###
 ###         - Update learning rate
@@ -29,74 +28,57 @@
 
 # Function for running a online training
 function training_online(;
-    spectral_grid,
-    lw_radiation_train,
-    run_config,
-    output_config,
-    output_path,
+    spectral_grid,      # spectral_grid of the model     
+    lw_train,           # longwave parameterization scheme to train
+    rc,                 # run configuration (RunConfig)
 )
 
     # Set seed for reproducability
-    Random.seed!(run_config.seed)
+    Random.seed!(rc.seed)
 
 
     # Setup optimiser
-    opt_state, eta = setup_optimiser(run_config, ps=lw_radiation_train.ps)
+    opt_state, eta = setup_optimiser(rc, ps=lw_train.ps)
 
-    # Setup simulations
-    sim_template, sim_train, sim_target = setup_simulations(
-        spectral_grid,
-        run_config,
-        lw_radiation_train,
-    )
-
-
-    # Calculate grid weights for loss function
-    grid_weights = area_weights(sim_train.variables.grid.temperature)
-
-
-    # Define containers for logging
-    L = Float32[]       # loss
-    PN = Float32[]      # parameter norm
-    GN = Float32[]      # gradient norm
+    # Setup simulations (template, training and target)
+    sims = setup_simulations(spectral_grid, rc, lw_train)
 
 
     # Initalize .csv file for logging
-    if output_config.train_save
-        metric_keys = keys(compute_metrics(lw_radiation_train, sim_train.variables, sim_target.variables))
-        csv_init(metric_keys; path=output_path, file=output_config.train_file)
-    end
+    metric_keys = keys(compute_metrics(lw_train, rc, sims, make_zero(lw_train.ps)))
+    csv_init(metric_keys; dir=rc.dir, file="training.csv")
 
     # Initialize folder for training plots
-    if output_config.plots_save
-        dir = joinpath(output_path, output_config.plots_folder)
-        mkpath(dir)
-    end
+    mkpath(joinpath(rc.dir, "train_plots"))
+
+
+    # Shuffle ics
+    bin_order = randperm(rc.n_ic)
 
 
     # Print training start information
     @info "Online training started!"
-    print_config(run_config, 2*sim_template.model.time_stepping.Δt_sec)
 
-    if ~run_config.do_autodiff
+    if !rc.do_autodiff
         @warn "Autodiff is deactivated! Enzyme.autodiff is NOT used!"
     end
 
+    print_config(rc, sims.template.model.time_stepping.Δt)
 
-    # Shuffle ics
-    bin_order = randperm(run_config.n_ic)
-
-    # Loop over initial conditions
-    for ic in 1:run_config.n_ic
     
-        # Update number of steps for calculating gradients
-        n_steps = run_config.n_steps_0 + (ic-1) * run_config.n_steps_inc
+
+    ### Main training loop
+    # Loop over initial conditions
+    for ic in 1:rc.n_ic
+
+        # Update number of steps used for calculating gradients
+        n_steps = rc.n_steps_0 + (ic-1) * rc.n_steps_inc
 
         # Draw a starting date
-        start_date = sample_start_date(bin_order[ic], run_config.n_ic)
+        start_date = sample_start_date(bin_order[ic], rc.n_ic)
     
         # Prepare reference simulation 
-        sim_ref = prepare_reference(sim_template, run_config, n_steps, start_date)
+        sim_ref = prepare_reference(sims.template, rc, n_steps, start_date)
 
 
         # Declare gradient sum and update flag for training step
@@ -106,175 +88,160 @@ function training_online(;
 
 
         # Loop over trajectory segments
-        for traj in 1:run_config.n_traj
+        for traj in 1:rc.n_traj
 
             # Copy reference variables
             vars0 = deepcopy(sim_ref.variables) 
 
-
             # Set target variables to reference variables
-            copy!(sim_target.variables, vars0)
-
+            copy!(sims.target.variables, vars0)
             # Propagate target simulation for gradient computation
-            sim_timesteps!(sim_target, n_steps)
+            sim_timesteps!(sims.target, n_steps)
+
+            # Set training variables to reference variables
+            copy!(sims.train.variables, vars0)
+            # Propagate training simulation for gradient computation
+            sim_timesteps!(sims.train, n_steps)
 
 
-
-            # Reuse same trajectory segment for several updates
-            for epoch in 1:run_config.n_epochs
-
-                # Re-create training simulation with updated radiation
-                sim_train = @set sim_train.model.longwave_radiation = lw_radiation_train
-
-
-                # Set training variables to reference variables
-                copy!(sim_train.variables, vars0)
-
-                # Propagate training simulation for gradient computation
-                sim_timesteps!(sim_train, n_steps)
-
-
-                # Print information of starting first training step
-                if ic == 1 && traj== 1 && epoch == 1
-                    @info "Start 1st training step!"
-                end
-
-                # Update flag for training step
-                if traj % run_config.n_batch == 0
-                    do_update = true
-                end
-
-
-                # Perform one online training step
-                step = online_training_step(;
-                    lw_radiation_train,
-                    do_update,
-                    grad_sum,
-                    vars0,
-                    sim_target,
-                    sim_train,
-                    n_steps,
-                    opt_state,
-                    n_batch = run_config.n_batch,
-                    do_autodiff = run_config.do_autodiff,
-                    grid_weights
-                )            
-
-
-                # Extract gradient sum and optimser state
-                grad_sum = step.grad_sum
-                opt_state = step.opt_state
-
-                # Update radiation scheme parameters after batch window
-                if do_update
-                    lw_radiation_train = step.lw_radiation
-                    do_update = false
-                end
-
-
-                # Store loss, parameters, gradients, and norms
-                push!(L, step.loss)
-                push!(PN, Float32(tree_l2norm(step.lw_radiation.ps)))
-                push!(GN, Float32(tree_l2norm(step.grads)))
-
-                # Write to .csv
-                if output_config.train_save
-                    csv_row!(
-                        ic, traj, epoch, n_steps, 
-                        L[end], eta, PN[end], GN[end], step.metrics;
-                        path=output_path, file=output_config.train_file
-                    )
-                end 
+            # Update flag for training step
+            if traj % rc.n_batch == 0
+                do_update = true
             end
+
+    
+            # Print information of starting first training step
+            if ic == 1 && traj== 1
+                @info "Start 1st training step!"
+            end
+
+            # Perform one online gradient step
+            step = online_gradient_step(;
+                lw_train,
+                rc,
+                sims,
+                vars0,
+                n_steps,
+                opt_state,
+                grad_sum,
+                do_update,
+            )            
+
+
+            # Compute metrics for logging
+            metrics = compute_metrics(
+                lw_train,
+                rc,
+                sims,
+                step.grads,
+            )
+
+
+            # Extract gradient sum and optimser state
+            grad_sum = step.grad_sum
+            opt_state = step.opt_state
+
+            # Update radiation scheme parameters after batch window
+            if do_update
+                lw_train = step.lw_train_updated
+                sims = @set sims.train.model.longwave_radiation = lw_train
+                do_update = false
+            end
+
+
+            # Write to .csv
+            csv_row!(
+                ic, traj, n_steps, eta;
+                metrics = metrics,
+                dir=rc.dir, file="training.csv"
+            )
 
 
             # Propagate reference trajectory forward
-            for _ in 1:(n_steps+run_config.n_gap)
-                SpeedyWeather.later_timestep!(sim_ref)
-            end
-            
-            
-            # Print trajectory update
-            if output_config.printing_traj
-                print_traj(traj, L[end], PN[end], GN[end])
-            end
+            sim_timesteps!(sim_ref, n_steps+rc.n_gap)
         end
 
 
         # Update learning rate after every ic and update optimiser
-        eta *= run_config.eta_decay
+        eta *= rc.eta_decay
         Optimisers.adjust!(opt_state, eta)
 
 
-        # Print IC update
-        if output_config.printing_ic
-            print_ic(ic, L[end], PN[end], GN[end])
-        end
-
-
         # Plot current loss trajectory after every ic
-        if output_config.plots_save
-            p = plot_training(L, PN, GN;
-                n_batch = run_config.n_batch,
-                plot_kwargs=(;plot_title = "until IC nr. $(ic) / $(run_config.n_ic)"),)
+        # Create plots
+        p = plot_training(;
+            dir = rc.dir, file = "training.csv", n_batch = rc.n_batch,
+            plot_kwargs = (; plot_title = "until IC nr. $(ic) / $(rc.n_ic)")
+        )
+        pn = plot_metrics_norm(;
+            dir = rc.dir, file = "training.csv", weights = rc.loss_config.weights,
+            plot_kwargs = (; plot_title = "until IC nr. $(ic) / $(rc.n_ic)")
+        )
+        pr = plot_metrics_raw(;
+            dir = rc.dir, file = "training.csv", weights = rc.loss_config.weights,
+            plot_kwargs = (; plot_title = "until IC nr. $(ic) / $(rc.n_ic)")
+        )
 
-            dir = joinpath(output_path, output_config.plots_folder)
-            file = joinpath(dir, "IC_$(ic).png")
-            
-            Plots.savefig(p, file)
-        end
-    end 
-    
+        # Prepare plots directory
+        dir = joinpath(rc.dir, "train_plots")
+
+        # Save plots
+        tag = "IC_" * lpad(ic, 2, '0')
+        Plots.savefig(p,  joinpath(dir, "training_$tag.png"))
+        Plots.savefig(pn, joinpath(dir, "metrics_norm_$tag.png"))
+        Plots.savefig(pr, joinpath(dir, "metrics_raw_$tag.png"))
+
+
+        @info "Initial condition $(ic) / $(rc.n_ic) finished!"
+    end
+
     @info "Training finished!"
 
-    return lw_radiation_train, L, PN, GN
+    return lw_train
 end
 
 
 
-# Function for performing one training step
-function online_training_step(;
-    lw_radiation_train,
-    do_update,
-    grad_sum,
+# Function for performing one gradient step
+function online_gradient_step(;
+    lw_train,
+    rc,
+    sims,
     vars0,
-    sim_target,
-    sim_train,
     n_steps,
     opt_state,
-    n_batch,
-    do_autodiff,
-    grid_weights,
+    grad_sum,
+    do_update,
 )
 
-    # Compute gradients and rest
-    grads, loss, metrics = compute_gradients(
-        vars0, 
-        sim_target, 
-        sim_train, 
-        n_steps, 
-        do_autodiff,
-        grid_weights
+    # Compute gradients
+    grads = compute_gradients(
+        rc,
+        sims,
+        vars0,
+        n_steps,
     )
 
     # Accumulate gradients over batch window
     grad_sum = isnothing(grad_sum) ? grads : tree_add(grad_sum, grads)
 
 
-    # Calculate mean gradients when scheme update is due
+    # Keep the current scheme unless an update is due below
+    lw_train_updated = lw_train
+
+    # Calculate mean gradient when scheme update is due
     if do_update
 
         # Calculate mean
-        avg = tree_scale(grad_sum, 1f0/n_batch)
+        grad_mean = tree_scale(grad_sum, 1f0/rc.n_batch)
 
         # Update optimiser and scheme
-        opt_state, ps_new = Optimisers.update(opt_state, lw_radiation_train.ps, avg)
-        lw_radiation_train = update_ps(lw_radiation_train, ps_new)
+        opt_state, ps_new = Optimisers.update(opt_state, lw_train.ps, grad_mean)
+        lw_train_updated = update_ps(lw_train, ps_new)
 
         # Reset gradient sum
         grad_sum = nothing
     end
 
-
-    return (; lw_radiation=lw_radiation_train, grads, loss, metrics, opt_state, grad_sum)
+    return (; lw_train_updated, grads, grad_sum, opt_state)
 end

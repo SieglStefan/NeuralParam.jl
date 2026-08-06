@@ -1,13 +1,19 @@
-# Intialize .csv file for logging training data and create a info.toml file for meta data
-function csv_init(metric_keys; path="", file="")
+### Logging of training data
+###
+### Functions for logging training data to .csv files and printing run configuration information
+
+
+
+# Initialize .csv file and create a info.toml file for meta data
+function csv_init(metric_keys; dir="", file="")
 
     # Create path and put together filepath
-    mkpath(path)
-    filepath = joinpath(path, file)
+    mkpath(dir)
+    filepath = joinpath(dir, file)
 
     # Write header
     open(filepath, "w") do io
-        println(io, "ic,traj,epoch,n_steps,loss,eta,pnorm,gnorm," * join(metric_keys, ","))
+        println(io, "ic,traj,n_steps,eta," * join(metric_keys, ","))
     end
 
     # Print information
@@ -18,14 +24,18 @@ end
 
 
 # Write a row of training data to .csv
-function csv_row!(ic, traj, epoch, n_steps, loss, eta, pnorm, gnorm, metrics; path="", file="")
+function csv_row!(
+    ic, traj, n_steps, eta;
+    metrics,
+    dir="", file=""
+)
 
     # Put together filepath
-    filepath = joinpath(path, file)
+    filepath = joinpath(dir, file)
 
     # Write a data row
     open(filepath, "a") do io
-        println(io, join((ic, traj, epoch, n_steps, loss, eta, pnorm, gnorm, values(metrics)...), ","))
+        println(io, join((ic, traj, n_steps, eta, values(metrics)...), ","))
     end
 
     return nothing
@@ -33,10 +43,10 @@ end
 
 
 # Read .csv data for plotting
-function csv_read(; path="", file="")
+function csv_read(; dir="", file="")
 
     # Put together filepath
-    filepath = joinpath(path, file)
+    filepath = joinpath(dir, file)
 
     # Read .csv data
     return CSV.read(filepath, DataFrame; comment="#")
@@ -44,37 +54,97 @@ end
 
 
 
+# Function for calculating metrics (losses, norms, bias,...) for logging
+function compute_metrics(lw_train, rc, sims, grads)
+    
+    # Unpack loss weights, field normalizations and grid weights
+    w = rc.loss_config.weights
+    fn = rc.loss_config.field_norm
+    gw = rc.loss_config.grid_weights
 
-# Print update after finishing one initial condition
-function print_ic(ic, loss, pnorm, gnorm)
-    println("\tIC $ic, Loss=$loss, |ps|=$pnorm, |g|=$gnorm")
-end
 
-# Print update after finishing one trajectory segment
-function print_traj(traj, loss, pnorm, gnorm)
-    println("\t\t\tTraj $traj, Loss=$loss, |ps|=$pnorm, |g|=$gnorm")
+    # Target fields
+    T_target = SpeedyWeather.get_step(sims.target.variables.grid.temperature)
+    olw_target = sims.target.variables.parameterizations.outgoing_longwave
+    slwd_target = sims.target.variables.parameterizations.surface_longwave_down
+
+    # Training fields
+    T_train = SpeedyWeather.get_step(sims.train.variables.grid.temperature)
+    olw_train = sims.train.variables.parameterizations.outgoing_longwave
+    slwd_train = sims.train.variables.parameterizations.surface_longwave_down
+
+    # Residuals
+    res_T    = T_train    .- T_target
+    res_olw  = olw_train  .- olw_target
+    res_slwd = slwd_train .- slwd_target
+
+
+    # Normalized rmse (dimensionless)
+    nrmse_T    = sqrt(wmean(abs2.(res_T    ./ fn.T),    gw))
+    nrmse_olw  = sqrt(wmean(abs2.(res_olw  ./ fn.olw),  gw))
+    nrmse_slwd = sqrt(wmean(abs2.(res_slwd ./ fn.slwd), gw))
+
+    # Calculate total loss
+    loss_t, loss_olw, loss_slwd = nrmse_T^2, nrmse_olw^2, nrmse_slwd^2
+    loss_total = w.T * loss_t + w.olw * loss_olw + w.slwd * loss_slwd
+
+
+    # Return diagnostics
+    return (;
+    
+        # Losses
+        loss_total = loss_total, loss_T = loss_t, loss_olw = loss_olw, loss_slwd = loss_slwd,
+
+        # Raw rmse and bias (physical units: K, W/m^2)
+        rmse_T    = sqrt(wmean(abs2.(res_T),    gw)),   bias_T    = wmean(res_T,    gw),
+        rmse_olw  = sqrt(wmean(abs2.(res_olw),  gw)),   bias_olw  = wmean(res_olw,  gw),
+        rmse_slwd = sqrt(wmean(abs2.(res_slwd), gw)),   bias_slwd = wmean(res_slwd, gw),
+
+        # Normalized rmse and bias
+        nrmse_T,    nbias_T    = wmean(res_T    ./ fn.T,    gw),
+        nrmse_olw,  nbias_olw  = wmean(res_olw  ./ fn.olw,  gw),
+        nrmse_slwd, nbias_slwd = wmean(res_slwd ./ fn.slwd, gw),
+
+        # Typical target values (area-weighted mean) — scale to judge rmse/bias against
+        mean_T    = wmean(T_target,    gw),
+        mean_olw  = wmean(olw_target,  gw),
+        mean_slwd = wmean(slwd_target, gw),
+        
+        # Optimizer diagnostics
+        pnorm = tree_l2norm(lw_train.ps),
+        gnorm = tree_l2norm(grads),
+    )
 end
 
 
 
 # Print information about the run configuration
-function print_config(run_c, dt_sec)
-    up_ic = run_c.n_traj * run_c.n_epochs
-    up_total =  run_c.n_ic * up_ic
+function print_config(rc, dt_sec)
 
-    t_gap = run_c.n_gap * dt_sec /3600
+    # single time step in days
+    dt_day = dt_sec /3600 /24
 
-    n_steps_start = run_c.n_steps_0
-    t_diff_start = n_steps_start * dt_sec /3600
-    t_ic_start = run_c.n_ic * run_c.n_traj * (run_c.n_gap + n_steps_start) * dt_sec/ (3600*24)
+    # Total updates per training
+    up_total = rc.n_ic * rc.n_traj ÷ rc.n_batch
 
-    n_steps_end = run_c.n_steps_0 + run_c.n_steps_inc * (run_c.n_ic-1)
-    t_diff_end = n_steps_end * dt_sec /3600
-    t_ic_end = run_c.n_ic * run_c.n_traj * (run_c.n_gap + n_steps_end) * dt_sec/ (3600*24)
+    # Batch window and gap size in days
+    t_batch = rc.n_batch * dt_day
+    t_gap = rc.n_gap * dt_day
 
-    println("\t\tNumber of updates per IC: ", up_ic)
-    println("\t\tNumber of total updates: ", up_total)
-    println("\t\tLength of gap timestepping (hours): ", t_gap)
-    println("\t\tLength of trajectory differentiation (hours): Start: ", t_diff_start, "\tEnd: ", t_diff_end)
-    println("\t\tTraining period per ic (days): Start: ", t_ic_start, "\tEnd: ", t_ic_end)
+    # Min. and max. length of single gradient trajectory in days
+    t_grad_start = rc.n_steps_0 * dt_day
+    t_grad_end = (rc.n_steps_0 + rc.n_steps_inc * (rc.n_ic-1)) * dt_day
+
+    # Total training period per IC in days
+    t_train_start = rc.n_traj * (t_grad_start + t_gap)
+    t_train_end = rc.n_traj * (t_grad_end + t_gap)
+
+    # Print information
+    println("----------Training run configuration:----------")
+    println("  - Number of total updates: ", up_total)
+    println("  - Length of training period per IC (days): \t\tStart: ", t_train_start, "\tEnd: ", t_train_end)
+    println("  - Length of batch window (days): ", t_batch)
+    println("  - Length of gap (days): ", t_gap)
+    println("  - Length of trajectory differentiation (hours): \tStart: ", t_grad_start*24, "\tEnd: ", t_grad_end*24)
+    println("-----------------------------------------------")
 end

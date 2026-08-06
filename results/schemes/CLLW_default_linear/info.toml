@@ -1,0 +1,59 @@
+[final]
+final_loss = 0.15212856233119965
+
+    [final.scheme]
+    def_co2 = 280.0
+    def_land_em = 0.9800000190734863
+    def_ocean_em = 0.9800000190734863
+    n_out = 21
+    output_form = "LinearOutput"
+    ps = [0.016071878373622894, 0.04205698519945145, 0.01818927377462387, -0.2930568754673004, 0.22779059410095215, 0.09473466128110886, 0.06090286746621132, 0.051646310836076736, -0.025660593062639236, -0.07308822125196457, -0.28333720564842224, 0.7398873567581177, -0.036579396575689316, -0.14732696115970612, -0.06863701343536377, -0.10785412788391113, 0.45635995268821716, -0.4722191393375397, -0.25765717029571533, -0.04087059572339058, 0.10783809423446655]
+    scheme = "ConstLW"
+    zscore_stats = "zscore_oblw_layer_4"
+
+[general]
+created = 2026-08-05T12:44:34.839Z
+julia = "1.10.11"
+name = "default_linear"
+seed = 42
+sw_vers = "0.21.1+DEV"
+
+[grid]
+grid_type = "OctahedralGaussianGrid"
+nlayers = 8
+trunc = 31
+
+[learning_rate]
+eta0 = 0.10000000149011612
+eta_decay = 0.699999988079071
+
+[loss]
+zscore = "zscore_oblw_layer_4"
+
+    [loss.weights]
+    T = 1.0
+    olw = 1.0
+    slwd = 1.0
+
+[model_type]
+emissivity_land = 0.9800000190734863
+emissivity_ocean = 0.9800000190734863
+lw_target = "OneBandLongwave"
+model = "PrimitiveWetModel"
+transmissivity = "FriersonLongwaveTransmissivity"
+
+[perturbation]
+fac_pert_q = 0.20000000298023224
+fac_pert_t = 2.0
+
+[steps]
+n_batch = 4
+n_gap = 50
+n_ic = 5
+n_steps_0 = 5
+n_steps_inc = 2
+n_traj = 80
+
+[training_time]
+start_date = "2000-01-01T00:00:00"
+t_spinup = "30 days"

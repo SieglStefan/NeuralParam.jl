@@ -1,0 +1,1 @@
+ic,traj,n_steps,eta,loss_total,loss_T,loss_olw,loss_slwd,rmse_T,bias_T,rmse_olw,bias_olw,rmse_slwd,bias_slwd,nrmse_T,nbias_T,nrmse_olw,nbias_olw,nrmse_slwd,nbias_slwd,mean_T,mean_olw,mean_slwd,pnorm,gnorm

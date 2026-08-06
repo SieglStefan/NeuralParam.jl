@@ -3,27 +3,11 @@
 # Structure:
 #
 # SpeedyWeather.AbstractLongwave        # longwave radiation parameterization schemes from SW
-#   - AbstractNeuralLW                  # schemes from this project
-#       - AbstractLinearLW              # schemes using linear output: dT = a * T + b
-#           - ConstLinearLW      
-#           - NeuralLinearLW
-#       - AbstractABRLW                 # schemes emulating AnalyticBandRadiation.jl
-#           - NeuralABRLW
-#           - NeuralABRLWGlobal
+#   - AbstractLW                        # schemes from this project
+#       - ConstLW                       # constant parameters scheme
+#       - NeuralLW                      # neural network scheme           
 
 
 
 # Common supertype for all longwave schemes in this project
-abstract type AbstractNeuralLW <: SpeedyWeather.AbstractLongwave end
-
-
-# Schemes using linear output: dT = a * T + b 
-abstract type AbstractLinearLW <: AbstractNeuralLW end
-
-
-# Schemes emulating AnalyticBandRadiation.jl
-abstract type AbstractABRLW <: AbstractNeuralLW end
-
-
-# Define conversion of general LW schemes (everything is already on cpu=
-to_cpu(s::AbstractNeuralLW) = s
+abstract type AbstractLW <: SpeedyWeather.AbstractLongwave end

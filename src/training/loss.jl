@@ -1,103 +1,111 @@
 ### Functions for calculating and seeding losses
 ###
-### XXX
+### Contains:
+###     - Function for calculating and seeding the loss function (MSE) for an AbstractLW scheme
+###     - Function for calculating unweighted metrics (RMSE, bias) for simulations
+###     - Struct and utilities for information about the loss (weighting)
 
 
 
-# Function for seeding the loss function (MSE) for a LinearLW scheme
-function seed_loss!(bvars_ad, para::AbstractLinearLW, vars_train, vars_target, grid_weights)
-    
-    # Extract final temperature fields
-    T_train = vars_train.grid.temperature
-    T_target = vars_target.grid.temperature
-    N_T = length(T_target)
+# Function for seeding the loss function (MSE) for an AbstractLW scheme
+function seed_loss!(rc, sims, vars_ad)
 
-    # Prepare grid area weights
-    W = reshape(grid_weights, :, 1)
+    # Create empty gradient container for autodiff
+    bvars_ad = make_zero(vars_ad)
 
-    # Seed the temperature gradient container
-    bvars_ad.grid.temperature.= 2f0 .* W .* (T_train .- T_target) ./N_T
-
-    # Return L = MSE
-    return sum(W .* abs2.(T_train .- T_target)) /N_T
-end
-
-
-# Function for seeding the loss function (MSE) for an ABRLW scheme
-function seed_loss!(bvars_ad, para::AbstractABRLW, vars_train, vars_target, grid_weights)
 
     # Extract final temperature fields
-    T_train = vars_train.grid.temperature
-    T_target = vars_target.grid.temperature
+    T_train = SpeedyWeather.get_step(sims.train.variables.grid.temperature)
+    T_target = SpeedyWeather.get_step(sims.target.variables.grid.temperature)
     N_T = length(T_target)
-
 
     # Extract fluxes
-    olw_train = vars_train.parameterizations.outgoing_longwave
-    olw_target = vars_target.parameterizations.outgoing_longwave
+    olw_train = sims.train.variables.parameterizations.outgoing_longwave
+    olw_target = sims.target.variables.parameterizations.outgoing_longwave
     N_olw = length(olw_target)
 
-    slwd_train = vars_train.parameterizations.surface_longwave_down
-    slwd_target = vars_target.parameterizations.surface_longwave_down
+    slwd_train = sims.train.variables.parameterizations.surface_longwave_down
+    slwd_target = sims.target.variables.parameterizations.surface_longwave_down
     N_slwd = length(slwd_target)
 
 
-    # Prepare grid area weights and extract number of vertical layers
-    W = reshape(grid_weights, :, 1)
-    nlayers = para.n_out - 2
+    # Unpack and prepare weights, field normalizations and grid weights
+    lw = rc.loss_config.weights
+    fw = rc.loss_config.field_norm
+    gw = rc.loss_config.grid_weights
 
-    
-    # Extract temperature mean and seed scaled temperature gradient container
-    T_mean = reshape(para.zscore.input_mean[1:nlayers], 1, :)  
-    bvars_ad.grid.temperature  .=                       2f0 .* W .* (T_train .- T_target)         ./T_mean.^2      ./N_T
 
-    # Extract flux means and seed scaled flux gradient containers
-    olw_mean = para.zscore.output_mean[end-1]
-    bvars_ad.parameterizations.outgoing_longwave .=     2f0 .* W .* (olw_train .- olw_target)     ./olw_mean.^2    ./N_olw
+    # Seed the gradient containers with dL/d(output), evaluated at the state after n_steps
+    #   - the seed must be the exact gradient of the loss returned below,
+    #     so any change to the loss has to be mirrored here
+    #   - after Enzyme.autodiff, bvars_ad holds dL/d(vars_ad at the start of the segment)
+    SpeedyWeather.get_step(bvars_ad.grid.temperature) .=
+        lw.T    .* 2f0 .* gw .* (T_train .- T_target)       ./fw.T.^2    ./N_T
 
-    slwd_mean = para.zscore.output_mean[end]
-    bvars_ad.parameterizations.surface_longwave_down .= 2f0 .* W .* (slwd_train .- slwd_target)   ./slwd_mean.^2   ./N_slwd
+    bvars_ad.parameterizations.outgoing_longwave .=
+        lw.olw  .* 2f0 .* gw .* (olw_train .- olw_target)   ./fw.olw.^2  ./N_olw
 
-    # Return L
-    return  sum(W .* abs2.(T_train .- T_target) ./T_mean.^2 ./N_T) +
-            sum(W .* abs2.(olw_train .- olw_target) ./olw_mean.^2 ./N_olw) +
-            sum(W .* abs2.(slwd_train .- slwd_target) ./slwd_mean.^2 ./N_slwd) 
+    bvars_ad.parameterizations.surface_longwave_down .=
+        lw.slwd .* 2f0 .* gw .* (slwd_train .- slwd_target) ./fw.slwd.^2 ./N_slwd
 
+
+    return bvars_ad
 end
 
 
 
+# Struct holding loss configuration parameters
+@kwdef struct LossConfig
+    weights::NamedTuple = (; T = 1f0, olw = 1f0, slwd = 1f0)        # loss weighting factors
+    field_norm::NamedTuple                                          # field normalization factors (zscore)
+    grid_weights                                                    # grid area weights
+end
+
+# Convenvience constructor for LossConfig loading zscore stats from a file
+function LossConfig(
+    spectral_grid::SpectralGrid,
+    zscore_name::String; 
+    weights = (; T = 1f0, olw = 1f0, slwd = 1f0)
+)
+
+    # Extract number of vertical layers
+    nlayers = spectral_grid.nlayers
+
+    # Caclulate grid weights
+    grid_weights = area_weights(spectral_grid)
 
 
+    # Load field normalization from zscore file
+    field_norm = load_field_norm(zscore_name)
 
-function compute_metrics(::AbstractABRLW, vars_train, vars_target)
-    T_train = vars_train.grid.temperature
-    T_target = vars_target.grid.temperature
 
-    olw_train = vars_train.parameterizations.outgoing_longwave
-    olw_target = vars_target.parameterizations.outgoing_longwave
+    # Check if length of T field_norm matches number of layers
+    if length(field_norm.T) != nlayers
+        error("LossConfig field_norm.T length $(length(field_norm.T)) does not match number of layers $nlayers.")
+    end
 
-    slwd_train = vars_train.parameterizations.surface_longwave_down
-    slwd_target = vars_target.parameterizations.surface_longwave_down
+    # Check if all field_norm entries are positive (0 would lead to Inf in loss)
+    if !all(all(>(0), v) for v in field_norm)
+        error("LossConfig field_norm entries must all be positive.")
+    end
 
-    return(;
-        rmse_T =    rmse(T_train, T_target),        bias_T =    bias(T_train, T_target),
-        rmse_olw =  rmse(olw_train, olw_target),    bias_olw =  bias(olw_train, olw_target),
-        rmse_slwd = rmse(slwd_train, slwd_target),  bias_slwd = bias(slwd_train, slwd_target),
+
+    return LossConfig(weights, field_norm, grid_weights)
+end
+
+
+# Load field normalization factors from zscore file
+function load_field_norm(zscore_name::String)
+
+    data = load_zscore(zscore_name)
+
+
+    return (;
+        T    = reshape(Float32.(getproperty(data.inputs.T, :std)), 1, :),
+        olw  = Float32(getproperty(data.direct.olw, :std)[1]),
+        slwd = Float32(getproperty(data.direct.slwd, :std)[1]),
     )
 end
-
-
-function compute_metrics(::AbstractLinearLW, vars_train, vars_target)
-    T_train = vars_train.grid.temperature
-    T_target = vars_target.grid.temperature
-
-    return(;
-        rmse_T =    rmse(T_train, T_target),        bias_T =    bias(T_train, T_target),
-    )
-end
-
-
 
 
 

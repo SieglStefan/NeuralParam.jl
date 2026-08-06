@@ -1,15 +1,12 @@
 ### Plotting utility functions
 ###
-### XXX Plotting possibilities:
+### Functions for plotting, currently only heatmaps
+###     - plot_heatmap:         plots a single heatmap of a field
+###     - plot_heatmaps:        plots multiple heatmaps of fields with shared colorbar
 
 
 
-
-
-
-
-
-# Helper functions for creating a coastline
+# Helper functions for creating a coastline overlay
 function field_to_lonlatmat(field)
     full = RingGrids.interpolate(RingGrids.full_grid_type(field.grid), field.grid.nlat_half, field)
     return RingGrids.get_lond(full), RingGrids.get_latd(full), Matrix(full)
@@ -18,6 +15,15 @@ end
 shift_lon(lond, mat) = (lon = [l > 180 ? l - 360 : l for l in lond]; p = sortperm(lon); (lon[p], mat[p, :]))
 
 finite_range(mats) = (v = filter(isfinite, vcat(vec.(mats)...)); (minimum(v), maximum(v)))
+
+function target_colorrange(traj; layer)
+    vals = Float32[]
+    for f in traj.temperature
+        append!(vals, vec(f[:, layer]))
+    end
+    return extrema(vals)
+end
+
 
 
 # Plot a single heatmap
@@ -41,6 +47,7 @@ function plot_heatmap(field; title = "Heatmap", coastlines = true, grid = false,
     CairoMakie.resize_to_layout!(fig)
     return fig
 end
+
 
 
 # Plot multiple heatmaps with shared colorbar
@@ -71,29 +78,5 @@ function plot_heatmaps(F_vec; titles = nothing, layout = :vertical, coastlines =
 
     isempty(suptitle) || CairoMakie.Label(fig[0, :], suptitle; fontsize = 18, font = :bold)
     CairoMakie.resize_to_layout!(fig)
-    return fig
-end
-
-
-
-
-
-# XXX
-function plot_histograms(data, titles; ncols=4, nbins=50, logx=false, suptitle="", size=(1500, 650))
-    fig = CairoMakie.Figure(; size)
-    for (k, (d, title)) in enumerate(zip(data, titles))
-        d = filter(isfinite, d)
-        logx && (d = log10.(filter(>(0), d)))
-        ax = CairoMakie.Axis(fig[cld(k, ncols), mod1(k, ncols)];
-                             title, titlesize = 12,
-                             xlabel = logx ? "log₁₀" : "",
-                             xticks = CairoMakie.LinearTicks(4),
-                             xticklabelrotation = π/5, xticklabelsize = 10)
-        CairoMakie.hist!(ax, d; bins = nbins)
-        CairoMakie.text!(ax, 0.03, 0.97;
-                         text = "μ=$(round(mean(d), sigdigits=4))\nσ=$(round(std(d), sigdigits=4))",
-                         space = :relative, align = (:left, :top), fontsize = 9)
-    end
-    isempty(suptitle) || CairoMakie.Label(fig[0, :], suptitle; fontsize = 17, font = :bold)
     return fig
 end

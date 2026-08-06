@@ -1,10 +1,10 @@
 ### General utility functions
 ###
-### XXX Helper functions used across
+### Helper functions used across the codebase
 
 
 
-# Extract vertical layer k from a series of fields
+# Extracts vertical layer k from a series of fields
 extract_layer(layer, f) = [i[:, layer] for i in f]
 
 
@@ -17,34 +17,22 @@ days_from_steps(n_steps, Δt_sec) = n_steps * Δt_sec / 86400
 
 
 
-# Sample starting dates uniformly across the year
-function sample_start_date(ic, n_ic; year=2000)
-    bin = 365 / n_ic
-    doy = (ic-1)*bin + rand()*bin
-    return DateTime(year, 1, 1) + Day(floor(Int, doy))
-end
-
-
-
-# Calulates extrema of a traj of layer for common colorbar range
-function target_colorrange(traj; layer)
-    vals = Float32[]
-    for f in traj.temperature
-        append!(vals, vec(f[:, layer]))
-    end
-    return extrema(vals)
-end
-
-
-
 # Extracts area weights of a grid from field
-function area_weights(field::AbstractField)
-    grid  = field.grid
-    Ω     = get_solid_angles(grid)              # solid angle per ring (length nlat)
-    rings = eachring(grid)                       # point-index range per ring
-    w     = zeros(Float32, size(field, 1))       # npoints
+function area_weights(spectral_grid::SpectralGrid)
+    
+    # Extract grid and angles
+    grid = spectral_grid.grid
+    Ω = get_solid_angles(grid)          # one solid angle per ring
+    rings = eachring(grid)              # point indices of every ring
+
+    # Prepare weights array (one entry per grid point)
+    w = zeros(Float32, spectral_grid.npoints)
+
+    # Populate weights array with solid angles
     for (j, ring) in enumerate(rings)
         @views w[ring] .= Ω[j]
     end
-    return w .* (length(w) / sum(w))            # normalize so mean weight = 1
+
+    # Normalize weights so that mean weight = 1
+    return w .* (length(w) / sum(w))
 end

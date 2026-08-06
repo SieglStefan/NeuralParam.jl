@@ -1,6 +1,6 @@
 ### Functions for benchmark evaluation
 ###
-### XXX
+### Evaluates the computational cost of longwave radiation schemes and compares them in a table
 
 
 
@@ -8,16 +8,15 @@
 function evaluate_benchmark(
     scheme;
     spectral_grid,
-    model_type = PrimitiveWetModel,
+    model = PrimitiveWetModel,
     n_steps = 10,
 )
 
     # Initialize simulation
-    sim = initialize!(model_type(spectral_grid; longwave_radiation = scheme))
+    sim = initialize!(model(spectral_grid; longwave_radiation = scheme))
     
     # Initialize steps and do a first timestep
-    SpeedyWeather.initialize!(sim, steps = n_steps+1)
-    SpeedyWeather.first_timesteps!(sim)
+    first_steps!(sim; steps=n_steps+1)
 
 
     # Benchmark
