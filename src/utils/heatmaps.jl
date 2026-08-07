@@ -1,6 +1,6 @@
-### Plotting utility functions
+### Heatmap utilities
 ###
-### Functions for plotting, currently only heatmaps
+### Functions for plotting heatmaps, primarly used in evaluation/rollouts.jl
 ###     - plot_heatmap:         plots a single heatmap of a field
 ###     - plot_heatmaps:        plots multiple heatmaps of fields with shared colorbar
 
@@ -14,39 +14,15 @@ end
 
 shift_lon(lond, mat) = (lon = [l > 180 ? l - 360 : l for l in lond]; p = sortperm(lon); (lon[p], mat[p, :]))
 
-finite_range(mats) = (v = filter(isfinite, vcat(vec.(mats)...)); (minimum(v), maximum(v)))
 
-function target_colorrange(traj; layer)
-    vals = Float32[]
-    for f in traj.temperature
-        append!(vals, vec(f[:, layer]))
-    end
-    return extrema(vals)
-end
+# Finite values of several fields/matrices, flattened
+_finite_values(mats) = filter(isfinite, vcat(vec.(mats)...))
 
+# Helper functions for creating a color range for heatmaps
+finite_range(mats) = (v = _finite_values(mats); (minimum(v), maximum(v)))
 
-
-# Plot a single heatmap
-function plot_heatmap(field; title = "Heatmap", coastlines = true, grid = false, kwargs...)
-    lond, latd, mat = field_to_lonlatmat(field)
-    fig = CairoMakie.Figure()
-
-    if coastlines
-        lon, mat = shift_lon(lond, mat)
-        ax = GeoMakie.GeoAxis(fig[1, 1]; dest = "+proj=longlat", title = title, width = 500, height = 250,
-                              xgridvisible = grid, ygridvisible = grid)
-        hm = CairoMakie.heatmap!(ax, lon, latd, mat; kwargs...)
-        CairoMakie.lines!(ax, GeoMakie.coastlines(); color = :black)
-    else
-        ax = CairoMakie.Axis(fig[1, 1]; title = title, width = 500, height = 250,
-                             xgridvisible = grid, ygridvisible = grid)
-        hm = CairoMakie.heatmap!(ax, lond, latd, mat; kwargs...)
-    end
-
-    CairoMakie.Colorbar(fig[1, 2], hm)
-    CairoMakie.resize_to_layout!(fig)
-    return fig
-end
+# Symmetric color range around zero, for difference maps
+sym_range(mats) = (m = maximum(abs, _finite_values(mats)); (-m, m))
 
 
 

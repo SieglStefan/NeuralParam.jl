@@ -8,7 +8,7 @@
 
 
 # Function for seeding the loss function (MSE) for an AbstractLW scheme
-function seed_loss!(rc, sims, vars_ad)
+function seed_loss(tc, sims, vars_ad)
 
     # Create empty gradient container for autodiff
     bvars_ad = make_zero(vars_ad)
@@ -30,9 +30,9 @@ function seed_loss!(rc, sims, vars_ad)
 
 
     # Unpack and prepare weights, field normalizations and grid weights
-    lw = rc.loss_config.weights
-    fw = rc.loss_config.field_norm
-    gw = rc.loss_config.grid_weights
+    lw = tc.loss_config.weights
+    fw = tc.loss_config.field_norm
+    gw = tc.loss_config.grid_weights
 
 
     # Seed the gradient containers with dL/d(output), evaluated at the state after n_steps
@@ -55,16 +55,16 @@ end
 
 
 # Struct holding loss configuration parameters
-@kwdef struct LossConfig
-    weights::NamedTuple = (; T = 1f0, olw = 1f0, slwd = 1f0)        # loss weighting factors
-    field_norm::NamedTuple                                          # field normalization factors (zscore)
-    grid_weights                                                    # grid area weights
+@kwdef struct LossConfig{W<:NamedTuple, F<:NamedTuple, G<:AbstractVector}
+    weights::W = (; T = 1f0, olw = 1f0, slwd = 1f0)        # loss weighting factors
+    field_norm::F                                          # field normalization factors (zscore)
+    grid_weights::G                                        # grid area weights
 end
 
 # Convenvience constructor for LossConfig loading zscore stats from a file
-function LossConfig(
+function LossConfig(;
     spectral_grid::SpectralGrid,
-    zscore_name::String; 
+    zscore_name::String, 
     weights = (; T = 1f0, olw = 1f0, slwd = 1f0)
 )
 
@@ -99,11 +99,16 @@ function load_field_norm(zscore_name::String)
 
     data = load_zscore(zscore_name)
 
+    # The loss is normalized by the RAW field stds, which live in the :direct group
+    haskey(data, :direct) || error(
+        "Stats in $zscore_name have no :direct group. The loss normalization needs the raw " *
+        "olw/slwd stds from it — regenerate the stats with DirectOutput() in output_forms.")
+
 
     return (;
-        T    = reshape(Float32.(getproperty(data.inputs.T, :std)), 1, :),
-        olw  = Float32(getproperty(data.direct.olw, :std)[1]),
-        slwd = Float32(getproperty(data.direct.slwd, :std)[1]),
+        T    = reshape(Float32.(data.inputs.T.std), 1, :),
+        olw  = Float32(data.direct.olw.std[1]),
+        slwd = Float32(data.direct.slwd.std[1]),
     )
 end
 

@@ -1,39 +1,24 @@
-### Generation of zscore statistics
+### Z-score statistics generation
 ###
-### Objective: Sample input and target output fields from perturbed simulations and calculate
-###     - input statistics per variable:                     T, q, p, lat, lf, sst, lst, Ts
-###     - direct output statistics:                          dT, olw, slwd
-###     - linear output statistics by per-column least squares: a, b (per layer), c, d, e, f, g
+### Writes to data/stats/<name>/:
+###     stats.jld2                  the statistics (below)
+###     plots/                      histograms + regression fits (do_plots)
+###
+### Structure of `data = load_zscore(name)` — every leaf is (; mean, std):
+###
+###     data.inputs.T       profile -> Vector(nlayers),  e.g. data.inputs.T.mean
+###     data.inputs.Ts      scalar  -> Vector(1),        e.g. data.inputs.Ts.std[1]
+###     data.direct         .dT (nlayers), .olw, .slwd
+###     data.linear         .a .b (nlayers), .c .d .e .f .g  - fitted on T
+###     data.planck         same as .linear, fitted on T^4
+###     data.nlayers, data.trunc
+###
+### - scalars are length-1 Vectors, not numbers -> index with [1]
+### - always holds ALL inputs and ALL output groups; a scheme picks its subset
 
 
 
 ### Sampling
-
-# Evaluate the target longwave scheme for all columns of the current state
-#   - the temperature tendency is accumulated by the scheme, so it has to be zeroed first
-#   - the flux fields are overwritten, so they can be read directly
-function target_outputs!(dT, olw, slwd, vars, model)
-
-    # Fetch the tendency step the scheme writes into
-    lw   = model.longwave_radiation
-    dTdt = SpeedyWeather.get_tendency_step(vars.tendencies.grid.temperature, model.time_stepping, lw)
-
-    # Zero the temperature tendency to isolate the longwave contribution
-    fill!(dTdt, 0)
-
-    # Call the target scheme column by column
-    for ij in axes(vars.grid.temperature, 1)
-        SpeedyWeather.parameterization!(ij, vars, lw, model)
-    end
-
-    # Copy out tendencies and fluxes
-    dT   .= dTdt
-    olw  .= vars.parameterizations.outgoing_longwave
-    slwd .= vars.parameterizations.surface_longwave_down
-
-    return nothing
-end
-
 
 # Collect input and target output fields from n_ic perturbed simulations
 function collect_samples(
@@ -65,18 +50,18 @@ function collect_samples(
 
 
 
-    # Declare empty template container (indexing for later statistics, e.g. linear regression for a and b)
-    prof() = zeros(Float32, npoints, nlayers, n_samples)        # profile variables
-    scal() = zeros(Float32, npoints, n_samples)                 # scalar variables
-
-    # Declare container for the target output fields
-    targets = (; dT = prof(), olw = scal(), slwd = scal())
-
-    # Declare container for the input fields, sampled through the INPUTS registry itself,
-    # so what is normalized here is exactly what a scheme reads at runtime
+    # Declare container for the input fields, sampled through the INPUTS registry itself
     n_in   = n_inputs(INPUTS, nlayers)
     layout = input_layout(INPUTS, nlayers)
     raw    = zeros(Float32, npoints, n_in, n_samples)
+
+    # Declare container for the target output fields
+    targets = (; 
+        dT   = zeros(Float32, npoints, nlayers, n_samples),     # profile
+        olw  = zeros(Float32, npoints, n_samples),              # scalar
+        slwd = zeros(Float32, npoints, n_samples),              # scalar 
+    )
+
 
     # Scratch arrays for one target evaluation
     dT_k   = zeros(Float32, npoints, nlayers)
@@ -149,24 +134,36 @@ function collect_samples(
 end
 
 
-# Pick a random subset of columns for regression diagnostics
-function subsample(s, n_cols; rng = Random.default_rng())
-    idx = randperm(rng, size(s.T, 1))[1:n_cols]
+# Helper function for evaluating the target longwave scheme for all columns of the current state
+function target_outputs!(dT, olw, slwd, vars, model)
 
-    return (; idx,
-        T = s.T[idx,:,:], dT = s.dT[idx,:,:],
-        Ts = s.Ts[idx,:], olw = s.olw[idx,:], slwd = s.slwd[idx,:]
-    )
+    # Fetch the tendency step the scheme writes into
+    lw   = model.longwave_radiation
+    dTdt = SpeedyWeather.get_tendency_step(vars.tendencies.grid.temperature, model.time_stepping, lw)
+
+    # Zero the temperature tendency to isolate the longwave contribution
+    fill!(dTdt, 0)
+
+    # Call the target scheme column by column
+    for ij in axes(vars.grid.temperature, 1)
+        SpeedyWeather.parameterization!(ij, vars, lw, model)
+    end
+
+    # Copy out tendencies and fluxes
+    dT   .= dTdt
+    olw  .= vars.parameterizations.outgoing_longwave
+    slwd .= vars.parameterizations.surface_longwave_down
+
+    return nothing
 end
 
 
-
-### Statistics
-
 # Input statistics, one entry per registered input
-#   - profiles get one mean/std per layer, scalars a single pair
-function input_stats(s, spec = INPUTS)
-    return (; (name => (last(entry) === :profile ? mean_std_layers(s[name]) : mean_std(s[name]))
+# Statistics of every input in spec, keyed by input name
+#   - lives here and not next to output_stats (output.jl) because it dispatches on nothing:
+#     output_stats has one method per output form and must stay beside decode!, this does not
+function input_stats(samples, spec = INPUTS)
+    return (; (name => (last(entry) === :profile ? mean_std_layers(samples[name]) : mean_std(samples[name]))
                for (name, entry) in pairs(spec))...)
 end
 
@@ -175,28 +172,21 @@ end
 ### Generation
 
 # Generate zscore statistics for a target scheme and store them as stats.jld2
-function generate_zscore(
-    spectral_grid;
-    name        = "default",                # name of the statistics
-    dir         = stats_dir(name),          # output directory
-    seed        = 1234,                     # seed for RNG
-
-    model       = PrimitiveWetModel,        # model used
-    lw_scheme   = nothing,                  # target longwave scheme the outputs are sampled from
-
-    output_forms = (DirectOutput(), LinearOutput(), PlanckOutput()),    # output forms fitted, one group each
-
-    t_spinup    = Day(30),                  # spinup time before sampling
-    start_date  = DateTime(2000, 1, 1),     # start date of the simulation
-    n_ic        = 1,                        # number of initial conditions
-    sim_time    = 365,                      # sampling time per IC in days
-    sample_gap  = 3.65,                     # days between two samples
-
-    fac_pert_T  = 2f0,                      # additive perturbation amplitude for temperature
-    fac_pert_q  = 0.2f0,                    # multiplicative perturbation amplitude for humidity
-
-    n_sub       = 200,                      # number of columns stored for the regression plots
-    do_plots    = true,                     # whether validation plots are created
+function generate_zscore(;
+    spectral_grid;              # used spectral grid
+    name,                       # name of the zscore statistics, stored in data/stats/<name>/
+    dir,                        # directory for storing the statistics
+    seed,                       # used seed for generating data
+    model,                      # used model type, e.g. PrimitiveWetModel
+    lw_scheme,                  # used longwave scheme, e.g. OneBandLongwave
+    output_forms,               # used output forms, e.g. (LinearOutput(), PlanckOutput())
+    t_spinup,                   # spinup time for each perturbed initial condition (days)
+    start_date,                 # starting date of the spinup (DateTime)
+    n_ic,                       # number of perturbed initial conditions to sample
+    sim_time,                   # simulation time for each perturbed initial condition (days)
+    sample_gap,                 # time between samples (days)
+    fac_pert_T,                 # perturbation factor for temperature (additive)
+    fac_pert_q,                 # perturbation factor for humidity (multiplicative)
 )
 
     # Set seed for reproducability
@@ -212,7 +202,7 @@ function generate_zscore(
 
 
     # Collect samples
-    s = collect_samples(
+    samples = collect_samples(
         sim_temp, sim_model;
         n_ic       = n_ic,
         t_spinup   = t_spinup,
@@ -224,11 +214,11 @@ function generate_zscore(
 
 
     # Fit the coefficients of every output form, one group per form
-    outputs = (; (output_group(f) => output_stats(f, s) for f in output_forms)...)
+    outputs = (; (output_group(f) => output_stats(f, samples) for f in output_forms)...)
 
     # Calculate statistics
     stats = (;
-        inputs = input_stats(s),
+        inputs = input_stats(samples),
         outputs...,
 
         # shape metadata, checked when a scheme loads these stats
@@ -236,18 +226,14 @@ function generate_zscore(
         trunc   = spectral_grid.trunc,
     )
 
-    # Store a subsample of the raw data for the regression plots
-    sub = subsample(s, n_sub)
 
-
-    # Save stats and regression subsample
+    # Save stats
     save(stats; dir, file = "stats.jld2")
-    save(sub;   dir, file = "regression_samples.jld2")
     @info "Statistics $(name) stored at $(dir)!"
 
 
     # Create validation plots
-    do_plots && plot_zscore(s, stats, sub; dir = joinpath(dir, "plots"), output_forms)
+    plot_zscore(samples, stats; dir = joinpath(dir, "plots"), output_forms)
 
-    return (; dir, stats, sub, samples = s)
+    return (; dir, stats, samples)
 end

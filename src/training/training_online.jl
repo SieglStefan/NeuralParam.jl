@@ -30,55 +30,55 @@
 function training_online(;
     spectral_grid,      # spectral_grid of the model     
     lw_train,           # longwave parameterization scheme to train
-    rc,                 # run configuration (RunConfig)
+    tc,                 # run configuration (TrainConfig)
 )
 
     # Set seed for reproducability
-    Random.seed!(rc.seed)
+    Random.seed!(tc.seed)
 
 
     # Setup optimiser
-    opt_state, eta = setup_optimiser(rc, ps=lw_train.ps)
+    opt_state, eta = setup_optimiser(tc, ps=lw_train.ps)
 
     # Setup simulations (template, training and target)
-    sims = setup_simulations(spectral_grid, rc, lw_train)
+    sims = setup_simulations(spectral_grid, tc, lw_train)
 
 
     # Initalize .csv file for logging
-    metric_keys = keys(compute_metrics(lw_train, rc, sims, make_zero(lw_train.ps)))
-    csv_init(metric_keys; dir=rc.dir, file="training.csv")
+    metric_keys = keys(compute_metrics(lw_train, tc, sims, make_zero(lw_train.ps)))
+    csv_init(metric_keys; dir=tc.dir, file="training.csv")
 
     # Initialize folder for training plots
-    mkpath(joinpath(rc.dir, "train_plots"))
+    mkpath(joinpath(tc.dir, "train_plots"))
 
 
     # Shuffle ics
-    bin_order = randperm(rc.n_ic)
+    bin_order = randperm(tc.n_ic)
 
 
     # Print training start information
     @info "Online training started!"
 
-    if !rc.do_autodiff
+    if !tc.do_autodiff
         @warn "Autodiff is deactivated! Enzyme.autodiff is NOT used!"
     end
 
-    print_config(rc, sims.template.model.time_stepping.Δt)
+    print_config(tc, sims.template.model.time_stepping.Δt)
 
     
 
     ### Main training loop
     # Loop over initial conditions
-    for ic in 1:rc.n_ic
+    for ic in 1:tc.n_ic
 
         # Update number of steps used for calculating gradients
-        n_steps = rc.n_steps_0 + (ic-1) * rc.n_steps_inc
+        n_steps = tc.n_steps_0 + (ic-1) * tc.n_steps_inc
 
         # Draw a starting date
-        start_date = sample_start_date(bin_order[ic], rc.n_ic)
+        start_date = sample_start_date(bin_order[ic], tc.n_ic)
     
         # Prepare reference simulation 
-        sim_ref = prepare_reference(sims.template, rc, n_steps, start_date)
+        sim_ref = prepare_reference(sims.template, tc, n_steps, start_date)
 
 
         # Declare gradient sum and update flag for training step
@@ -88,7 +88,7 @@ function training_online(;
 
 
         # Loop over trajectory segments
-        for traj in 1:rc.n_traj
+        for traj in 1:tc.n_traj
 
             # Copy reference variables
             vars0 = deepcopy(sim_ref.variables) 
@@ -105,7 +105,7 @@ function training_online(;
 
 
             # Update flag for training step
-            if traj % rc.n_batch == 0
+            if traj % tc.n_batch == 0
                 do_update = true
             end
 
@@ -118,7 +118,7 @@ function training_online(;
             # Perform one online gradient step
             step = online_gradient_step(;
                 lw_train,
-                rc,
+                tc,
                 sims,
                 vars0,
                 n_steps,
@@ -131,7 +131,7 @@ function training_online(;
             # Compute metrics for logging
             metrics = compute_metrics(
                 lw_train,
-                rc,
+                tc,
                 sims,
                 step.grads,
             )
@@ -153,37 +153,37 @@ function training_online(;
             csv_row!(
                 ic, traj, n_steps, eta;
                 metrics = metrics,
-                dir=rc.dir, file="training.csv"
+                dir=tc.dir, file="training.csv"
             )
 
 
             # Propagate reference trajectory forward
-            sim_timesteps!(sim_ref, n_steps+rc.n_gap)
+            sim_timesteps!(sim_ref, n_steps+tc.n_gap)
         end
 
 
         # Update learning rate after every ic and update optimiser
-        eta *= rc.eta_decay
+        eta *= tc.eta_decay
         Optimisers.adjust!(opt_state, eta)
 
 
         # Plot current loss trajectory after every ic
         # Create plots
         p = plot_training(;
-            dir = rc.dir, file = "training.csv", n_batch = rc.n_batch,
-            plot_kwargs = (; plot_title = "until IC nr. $(ic) / $(rc.n_ic)")
+            dir = tc.dir, file = "training.csv", n_batch = tc.n_batch,
+            plot_kwargs = (; plot_title = "until IC nr. $(ic) / $(tc.n_ic)")
         )
         pn = plot_metrics_norm(;
-            dir = rc.dir, file = "training.csv", weights = rc.loss_config.weights,
-            plot_kwargs = (; plot_title = "until IC nr. $(ic) / $(rc.n_ic)")
+            dir = tc.dir, file = "training.csv", weights = tc.loss_config.weights,
+            plot_kwargs = (; plot_title = "until IC nr. $(ic) / $(tc.n_ic)")
         )
         pr = plot_metrics_raw(;
-            dir = rc.dir, file = "training.csv", weights = rc.loss_config.weights,
-            plot_kwargs = (; plot_title = "until IC nr. $(ic) / $(rc.n_ic)")
+            dir = tc.dir, file = "training.csv",
+            plot_kwargs = (; plot_title = "until IC nr. $(ic) / $(tc.n_ic)")
         )
 
         # Prepare plots directory
-        dir = joinpath(rc.dir, "train_plots")
+        dir = joinpath(tc.dir, "train_plots")
 
         # Save plots
         tag = "IC_" * lpad(ic, 2, '0')
@@ -192,7 +192,7 @@ function training_online(;
         Plots.savefig(pr, joinpath(dir, "metrics_raw_$tag.png"))
 
 
-        @info "Initial condition $(ic) / $(rc.n_ic) finished!"
+        @info "Initial condition $(ic) / $(tc.n_ic) finished!"
     end
 
     @info "Training finished!"
@@ -205,7 +205,7 @@ end
 # Function for performing one gradient step
 function online_gradient_step(;
     lw_train,
-    rc,
+    tc,
     sims,
     vars0,
     n_steps,
@@ -216,7 +216,7 @@ function online_gradient_step(;
 
     # Compute gradients
     grads = compute_gradients(
-        rc,
+        tc,
         sims,
         vars0,
         n_steps,
@@ -233,7 +233,7 @@ function online_gradient_step(;
     if do_update
 
         # Calculate mean
-        grad_mean = tree_scale(grad_sum, 1f0/rc.n_batch)
+        grad_mean = tree_scale(grad_sum, 1f0/tc.n_batch)
 
         # Update optimiser and scheme
         opt_state, ps_new = Optimisers.update(opt_state, lw_train.ps, grad_mean)

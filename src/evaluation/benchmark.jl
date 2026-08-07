@@ -19,8 +19,8 @@ function evaluate_benchmark(
     first_steps!(sim; steps=n_steps+1)
 
 
-    # Benchmark
-    b = @benchmark sim_timesteps!($sim, $n_steps)
+    # Fresh simulation per sample: sim_timesteps! mutates, so samples must not chain
+    b = @benchmark sim_timesteps!(s, $n_steps) setup=(s = deepcopy($sim)) evals=1 samples=20 seconds=60
 
 
     return (;

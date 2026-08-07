@@ -3,7 +3,7 @@
 ### - Histograms of the z-score normalized inputs and outputs (should look ~N(0,1))
 ### - Regression diagnostics for the linear output form:
 ###       dT   = a*T + b              one panel per layer
-###       olw  = c + d*T[1] + e*Ts    one panel per predictor
+###       olw  = c + d*T[mid_layer] + e*Ts    one panel per predictor
 ###       slwd = f + g*T[nlayers]     one panel
 ###
 ### The coefficients are fitted per column, the scatter pools all columns and the red
@@ -51,10 +51,10 @@ end
 
 
 # Histograms of several normalized SCALAR variables, all in one figure
-function plot_scalar_histograms(s, st, names; suptitle = "Normalized scalars", ncols = 3)
+function plot_scalar_histograms(samples, st, names; suptitle = "Normalized scalars", ncols = 3)
 
     # Look both the samples and their stats up by name
-    data   = [vec(zscore(getproperty(s, n),
+    data   = [vec(zscore(getproperty(samples, n),
                          getproperty(st, n).mean[1],
                          getproperty(st, n).std[1])) for n in names]
     titles = [string(n) for n in names]
@@ -77,19 +77,19 @@ end
 
 
 # dT = a*P(T) + b, fitted per column and layer — one panel per layer
-function plot_regression_dT(sub, lin, form = LinearOutput(); ncols = 4, max_pts = 3000)
+function plot_regression_dT(samples, lin, form = LinearOutput(); ncols = 4, max_pts = 3000)
 
-    nlayers = Base.size(sub.T, 2)
+    nlayers = Base.size(samples.T, 2)
     fig = CairoMakie.Figure(size = (350*ncols, 300*cld(nlayers, ncols)))
 
     # Plot against the predictor the coefficients were fitted on
-    P = predictor(form, sub.T)
+    P = predictor(form, samples.T)
 
     for k in 1:nlayers
         r, c = fldmod1(k, ncols)
         ax = CairoMakie.Axis(fig[r, c]; xlabel = "P(T)", ylabel = "dT (K/s)", title = "Layer $k")
 
-        x, y = thin(max_pts, vec(P[:,k,:]), vec(sub.dT[:,k,:]))
+        x, y = thin(max_pts, vec(P[:,k,:]), vec(samples.dT[:,k,:]))
         CairoMakie.scatter!(ax, x, y; markersize = 2, alpha = 0.2)
 
         # Line uses the column-MEAN coefficients, the scatter pools all columns,
@@ -105,16 +105,18 @@ end
 
 
 # Both flux regressions in one figure:
-#   olw  = c + d*P(T[olw_layer]) + e*P(Ts)  two predictors, one panel each with the other held at its mean
+#   olw  = c + d*P(T[mid_layer]) + e*P(Ts)  two predictors, one panel each with the other held at its mean
 #   slwd = f + g*P(T[nlayers])              one predictor, plain scatter with its line
-function plot_regression_flux(sub, lin, form = LinearOutput(); max_pts = 5000)
+function plot_regression_flux(samples, lin, form = LinearOutput(); max_pts = 5000)
 
-    nlayers = Base.size(sub.T, 2)
+    nlayers = Base.size(samples.T, 2)
 
     # Plot against the predictors the coefficients were fitted on
-    T1 = predictor(form, sub.T)[:, olw_layer(nlayers), :]    # olw layer temperature
-    Tb = predictor(form, sub.T)[:, nlayers, :]               # bottom-layer temperature
-    Ts = predictor(form, sub.Ts)                             # surface temperature
+    #   - transform once: predictor() copies the whole profile array
+    P  = predictor(form, samples.T)
+    T1 = P[:, mid_layer(nlayers), :]                         # olw layer temperature
+    Tb = P[:, nlayers, :]                                    # bottom-layer temperature
+    Ts = predictor(form, samples.Ts)                         # surface temperature
 
     # Column-mean coefficients — what ConstLW starts from
     c, d, e = lin.c.mean[1], lin.d.mean[1], lin.e.mean[1]
@@ -122,18 +124,18 @@ function plot_regression_flux(sub, lin, form = LinearOutput(); max_pts = 5000)
 
     fig = CairoMakie.Figure(size = (1050, 340))
 
-    # (1) olw vs T[olw_layer], with Ts held at its mean so a line can be drawn
-    ax1 = CairoMakie.Axis(fig[1,1]; xlabel = "P(T[$(olw_layer(nlayers))])", ylabel = "olw (W/m²)",
-                          title = "olw vs olw-layer T")
-    x, y = thin(max_pts, vec(T1), vec(sub.olw))
+    # (1) olw vs T[mid_layer], with Ts held at its mean so a line can be drawn
+    ax1 = CairoMakie.Axis(fig[1,1]; xlabel = "P(T[$(mid_layer(nlayers))])", ylabel = "olw (W/m²)",
+                          title = "olw vs mid-layer T")
+    x, y = thin(max_pts, vec(T1), vec(samples.olw))
     CairoMakie.scatter!(ax1, x, y; markersize = 2, alpha = 0.2)
     xr = range(extrema(x)...; length = 2)
     CairoMakie.lines!(ax1, xr, c .+ d .* xr .+ e * mean(Ts); color = :red)
 
-    # (2) olw vs Ts, with T[olw_layer] held at its mean
+    # (2) olw vs Ts, with T[mid_layer] held at its mean
     ax2 = CairoMakie.Axis(fig[1,2]; xlabel = "P(Ts)", ylabel = "olw (W/m²)",
                           title = "olw vs surface T")
-    x, y = thin(max_pts, vec(Ts), vec(sub.olw))
+    x, y = thin(max_pts, vec(Ts), vec(samples.olw))
     CairoMakie.scatter!(ax2, x, y; markersize = 2, alpha = 0.2)
     xr = range(extrema(x)...; length = 2)
     CairoMakie.lines!(ax2, xr, c .+ d * mean(T1) .+ e .* xr; color = :red)
@@ -141,13 +143,13 @@ function plot_regression_flux(sub, lin, form = LinearOutput(); max_pts = 5000)
     # (3) slwd vs T[nlayers], only one predictor
     ax3 = CairoMakie.Axis(fig[1,3]; xlabel = "P(T[nlayers])", ylabel = "slwd (W/m²)",
                           title = "slwd vs bottom-layer T")
-    x, y = thin(max_pts, vec(Tb), vec(sub.slwd))
+    x, y = thin(max_pts, vec(Tb), vec(samples.slwd))
     CairoMakie.scatter!(ax3, x, y; markersize = 2, alpha = 0.2)
     xr = range(extrema(x)...; length = 2)
     CairoMakie.lines!(ax3, xr, f .+ g .* xr; color = :red)
 
     CairoMakie.Label(fig[0, :],
-        "$(nameof(typeof(form))): olw = c + d*P(T[$(olw_layer(nlayers))]) + e*P(Ts)        " *
+        "$(nameof(typeof(form))): olw = c + d*P(T[$(mid_layer(nlayers))]) + e*P(Ts)        " *
         "slwd = f + g*P(T[nlayers])        (red: column-mean coefficients)";
         fontsize = 15, font = :bold)
     return fig
@@ -160,7 +162,7 @@ end
 # Create all validation plots of a zscore statistics run and store them as .png
 #   - only the groups actually present in stats are plotted, so dropping an output form
 #     from the generation does not break the plotting
-function plot_zscore(s, stats, sub; dir, output_forms = (DirectOutput(), LinearOutput()))
+function plot_zscore(samples, stats; dir, output_forms = (DirectOutput(), LinearOutput(), PlanckOutput()))
 
     # Create output directory
     mkpath(dir)
@@ -168,17 +170,17 @@ function plot_zscore(s, stats, sub; dir, output_forms = (DirectOutput(), LinearO
     # One figure per entry, the key becomes the file name
     plots = (;
         # Normalized inputs: one .png per profile variable, all scalars in one
-        input_T       = plot_profile_histograms(s.T, stats.inputs.T; name = "T"),
-        input_q       = plot_profile_histograms(s.q, stats.inputs.q; name = "log10(q)"),
-        input_scalar  = plot_scalar_histograms(s, stats.inputs, (:p, :lat, :lf, :sst, :lst, :Ts);
+        input_T       = plot_profile_histograms(samples.T, stats.inputs.T; name = "T"),
+        input_q       = plot_profile_histograms(samples.q, stats.inputs.q; name = "log10(q)"),
+        input_scalar  = plot_scalar_histograms(samples, stats.inputs, (:p, :lat, :lf, :sst, :lst, :Ts);
                                                suptitle = "Normalized scalar inputs"),
     )
 
     # Normalized direct outputs: dT per layer, fluxes together
     if haskey(stats, :direct)
         plots = merge(plots, (;
-            output_dT     = plot_profile_histograms(s.dT, stats.direct.dT; name = "dT"),
-            output_scalar = plot_scalar_histograms(s, stats.direct, (:olw, :slwd);
+            output_dT     = plot_profile_histograms(samples.dT, stats.direct.dT; name = "dT"),
+            output_scalar = plot_scalar_histograms(samples, stats.direct, (:olw, :slwd);
                                                    suptitle = "Normalized scalar outputs"),
         ))
     end
@@ -191,8 +193,8 @@ function plot_zscore(s, stats, sub; dir, output_forms = (DirectOutput(), LinearO
         haskey(stats, group) || continue
 
         plots = merge(plots, (;
-            (Symbol("regression_$(group)_dT")   => plot_regression_dT(sub, stats[group], form),
-             Symbol("regression_$(group)_flux") => plot_regression_flux(sub, stats[group], form))...,
+            (Symbol("regression_$(group)_dT")   => plot_regression_dT(samples, stats[group], form),
+             Symbol("regression_$(group)_flux") => plot_regression_flux(samples, stats[group], form))...,
         ))
     end
 

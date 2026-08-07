@@ -27,7 +27,7 @@ function plot_loss(; dir="", file="", kwargs...)
     
     # Read and extract data
     df = csv_read(;dir, file)
-    loss = df.loss
+    loss = df.loss_total
     
     return plot_loss(loss; kwargs...)
 end
@@ -126,7 +126,7 @@ end
 function plot_training_comp(runs::AbstractVector{<:Tuple}; labels=nothing, kwargs...)
 
     # Read and extract data
-    losses = [csv_read(; dir=p, file=f).loss for (p,f) in runs]
+    losses = [csv_read(; dir=p, file=f).loss_total for (p,f) in runs]
     labs = isnothing(labels) ? [f for (_,f) in runs] : labels
 
     return plot_training_comp(losses; labels=labs, kwargs...)
@@ -135,7 +135,7 @@ end
 
 
 # Plot normalized metrics of a training run: losses, normalized rmse and bias
-function plot_metrics_norm(; dir="", file="", weights=nothing, kwargs...)
+function plot_metrics_norm(; dir="", file="", weights=nothing, plot_kwargs = (;))
 
     df = csv_read(; dir, file)
 
@@ -166,15 +166,14 @@ function plot_metrics_norm(; dir="", file="", weights=nothing, kwargs...)
 
 
     defaults = (; size = (700, 900), left_margin = 8Plots.mm)
-    merged   = merge(defaults, values(kwargs))
 
-    return Plots.plot(p1, p2, p3; layout = (3, 1), merged...)
+    return Plots.plot(p1, p2, p3; layout = (3, 1), merge(defaults, plot_kwargs)...)
 end
 
 
 
 # Plot raw metrics of a training run in physical units, grouped by unit
-function plot_metrics_raw(; dir="", file="", kwargs...)
+function plot_metrics_raw(;  dir="", file="", plot_kwargs = (;))
 
     df = csv_read(; dir, file)
 
@@ -193,7 +192,5 @@ function plot_metrics_raw(; dir="", file="", kwargs...)
 
 
     defaults = (; size = (700, 600), left_margin = 8Plots.mm)
-    merged   = merge(defaults, values(kwargs))
-
-    return Plots.plot(p1, p2; layout = (2, 1), merged...)
+    return Plots.plot(p1, p2; layout = (2, 1), merge(defaults, plot_kwargs)...)
 end

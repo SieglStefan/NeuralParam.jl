@@ -114,49 +114,34 @@ end
 
 
 
-### Lazily-read reference dataset: one model state per simulated day
+### Lazily-read reference dataset: one full model state per simulated day
 struct Reference{S}
     store::S            # open .jld2 file — states are read on demand, not held in RAM
     sim_days::Int       # last available day; valid days are 0:sim_days
-    full_gap::Int       # a full (restart) state is stored every full_gap days
 end
 
-# Index by simulated day directly: ref[0] is the initial state, ref[12] the state after 12 days
-#   - returns the full state, i.e. what a simulation is restarted from
-Base.getindex(ref::Reference, day::Integer)  = ref.store["day_$(day)/full"]
-
-# Days a rollout can be initialized from
-restart_days(ref::Reference) = 0:ref.full_gap:ref.sim_days
-
-
-# Grid fields only — much smaller read than the full state
-grid_state(ref::Reference, day::Integer)     = ref.store["day_$(day)/grid"]
-
-# Verification fields (grid + parameterizations) — probed against a rollout
-#   - falls back to the full state for older references written without a param group
-function verify_state(ref::Reference, day::Integer)
-
-    key = "day_$(day)/param"
-    haskey(ref.store, key) || return ref[day]
-
-    return (; grid = ref.store["day_$(day)/grid"], parameterizations = ref.store[key])
-end
+# Index by simulated day: ref[0] is the initial state, ref[12] the state after 12 days
+Base.getindex(ref::Reference, day::Integer) = ref.store["day_$(day)"]
 
 # Open a stored reference for the duration of the callback
 function with_reference(fn, name::AbstractString)
     JLD2.jldopen(joinpath(reference_dir(name), "reference.jld2"), "r") do store
-        full_gap = haskey(store, "full_gap") ? store["full_gap"] : 1
-        fn(Reference(store, store["sim_days"], full_gap))
+        fn(Reference(store, store["sim_days"]))
     end
 end
 
 
 # Open a .jld2 store for incremental writing; the callback receives the open file
 function save_store(fn; dir, file)
+    
+    # Create directory and creaet filepath
     mkpath(dir)
     filepath = joinpath(dir, file)
+
+    # Open the file and call the callback
     JLD2.jldopen(filepath, "w") do store
         fn(store)
     end
+
     return filepath
 end

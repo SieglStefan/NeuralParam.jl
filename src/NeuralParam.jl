@@ -31,7 +31,7 @@ using BenchmarkTools
 
 
 
-export  
+export
         ### utils
         # metrics.jl
                         #wmean,
@@ -41,31 +41,31 @@ export
                         #wbias,
                         #correlation,
                         #maxdiff,
+                        #area_weights,
+        # stats.jl
+                        #mean_std,
+                        #mean_std_layers,
+                        #fit_linear,
+        # tree.jl
                         #tree_l2sum,
                         #tree_l2norm,
                         #tree_add,
                         #tree_scale,
-        # plotting.jl
+        # heatmaps.jl
                         #field_to_lonlatmat,
-                        #shift_lom,
+                        #shift_lon,
                         #finite_range,
-                plot_heatmap,
+                        #sym_range,
                 plot_heatmaps,
-        # utils.jl
-                extract_layer,
+        # simulation.jl
                 steps_from_days,
-                days_from_steps,
+                        #days_from_steps,
+                perturb_grid_field!,
+                first_steps!,
+                sim_timesteps!,
 
 
         ### data
-        # data_gen.jl
-                perturb_grid_field!,
-                sample_start_date,
-                first_steps!,
-                sim_timesteps!,
-                PROBES,
-                sample_trajectory,
-                sample_grid_trajectory,
         # io.jl
                         #save,
                         #load,
@@ -76,40 +76,35 @@ export
                 rollout_dir,
                 collect_schemes,
                 collect_rollouts,
-                resolve_scheme,
+                        #resolve_scheme,
                 scheme_name,
                         #_toml,
                 write_info,
                 prepare_out_dir,
                 fresh_out_dir,
                 Reference,
-                        #restart_days,
-                grid_state,
-                verify_state,
                 with_reference,
-                save_store,
+                        #save_store,
         # zscore.jl
                         #zscore,
                         #inv_zscore,
-                        #mean_std,
-                        #mean_std_layers,
-                        #fit_linear,
                 ZScoreStats,
                 load_zscore,
                         #collect_stats,
-        # generate_reference.jl
+        # generate/generate_reference.jl
                 generate_reference,
-        # generate_rollout.jl
-                        #n_cols,
-                        #get_col,
+        # generate/generate_rollout.jl
+                DEF_PROBES,
+                        #sample_trajectory,
+                        #n_layers,
+                        #get_layer,
                 generate_rollout,
-        # generate_zscore.jl
+        # generate/generate_zscore.jl
                         #target_outputs!,
                         #collect_samples,
-                        #subsample,
                         #input_stats,
                 generate_zscore,
-        # plot_zscore.jl
+        # generate/plot_zscore.jl
                         #plot_histograms,
                         #plot_profile_histograms,
                         #plot_scalar_histograms,
@@ -143,9 +138,9 @@ export
                         #in_sst,
                         #in_lst,
                         #in_Ts,
-                        #INPUTS,
-                        #input_spec,
-                IN_NLW_OBLW,
+                INPUTS,
+                input_spec,
+                INPUT_NLW_OBLW,
                         #n_inputs,
                         #input_layout,
                         #fill_inputs!,
@@ -157,7 +152,7 @@ export
                         #n_outputs,
                 output_group,
                 output_keys,
-                        #olw_layer,
+                        #mid_layer,
                         #decode!,
                         #lw_state,
 
@@ -174,7 +169,7 @@ export
 
         ### training
         # config.jl
-                RunConfig,
+                TrainConfig,
         # gradients.jl
                         #compute_gradients,
                         #checkpointed_timesteps!,
@@ -185,9 +180,8 @@ export
                         #compute_metrics,
                 print_config,
         # loss.jl
-                        #seed_loss!,
+                        #seed_loss,
                 LossConfig,
-                        #area_weights,
                         #load_field_norm,
         # plotting.jl
                 plot_loss,
@@ -201,20 +195,22 @@ export
                         #setup_simulations,
                         #setup_optimiser,
                         #prepare_reference,
+                sample_start_date,
         # training_offline.jl
                 # ---
         # training_online.jl
                         #training_online,
-                        #online_training_step,
+                        #online_gradient_step,
 
 
         ### evaluation
         # rollout.jl
+                        #DEF_PROBE_UNITS,
                         #reduce_cols,
                 rollout_curve,
                 plot_rollout,
+                plot_rollout_metrics,
                         #hm_field,
-                        #sym_range,
                 plot_rollout_heatmaps,
         # benchmark.jl
                 evaluate_benchmark,
@@ -225,19 +221,20 @@ export
 
 
 # General utils
-include("utils/utils.jl")
 include("utils/metrics.jl")
-include("utils/plotting.jl")
+include("utils/stats.jl")
+include("utils/tree.jl")
+include("utils/heatmaps.jl")
+include("utils/simulation.jl")
 
 
 # Data generation
 include("data/io.jl")
-include("data/data_gen.jl")
 include("data/zscore.jl")
-include("data/generate_reference.jl")
-include("data/generate_rollout.jl")
-include("data/generate_zscore.jl")
-include("data/plot_zscore.jl")
+include("data/generate/generate_reference.jl")
+include("data/generate/generate_rollout.jl")
+include("data/generate/generate_zscore.jl")
+include("data/generate/plot_zscore.jl")
 
 
 # Architectures
@@ -256,7 +253,7 @@ include("parameterizations/longwave/scheme_neural.jl")
 
 
 # Training infrastructure
-include("training/loss.jl")         # must precede config.jl: RunConfig annotates a LossConfig field
+include("training/loss.jl")
 include("training/config.jl")
 include("training/gradients.jl")
 include("training/setup.jl")

@@ -8,7 +8,7 @@
 function run_training(
     spectral_grid,                      # spectral_grid of the model         
     lw_train,                           # longwave parameterization scheme to train 
-    run_config,                         # run configuration (RunConfig)
+    train_config,                       # train configuration (TrainConfig)
 )
 
 
@@ -20,13 +20,13 @@ function run_training(
     lw_trained = training_online(;
         spectral_grid,
         lw_train,
-        rc = run_config,
+        tc = train_config,
     )
 
 
     # Save scheme after training
-    save(lw_trained; dir=run_config.dir, file="scheme.jld2")
-    @info "Scheme $(run_config.name) stored at $(run_config.dir)!"
+    save(lw_trained; dir=train_config.dir, file="scheme.jld2")
+    @info "Scheme $(train_config.name) stored at $(train_config.dir)!"
 
 
     return lw_trained

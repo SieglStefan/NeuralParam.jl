@@ -14,7 +14,7 @@ struct NeuralLW{N,P,S,C,I,O,Z,B} <: AbstractLW
     n_out::Int              # output dim of NN
     arch_config::C          # architecture configuration of NN  
 
-    inputs::I               # list of inputs used in the scheme, e.g. (:T, :Ts)
+    input_spec::I           # list of inputs used in the scheme, e.g. (; T = (in_t, :profile), Ts = (in_ts, :scalar), ...)
     output_form::O          # output form of scheme, e.g. :linear
     zscore::Z               # loaded zscore parameters
 
@@ -27,14 +27,14 @@ end
 
 
 # Constructor for creating Lux nn architecture and parameters
-function NeuralLW(
+function NeuralLW(;
     spectral_grid::SpectralGrid,
     arch_config,
-    inputs,
+    input_spec,
     output_form,
-    zscore_name;
-    def_ocean_em = 0.92f0,
-    def_land_em = 0.92f0,
+    zscore_name,
+    def_ocean_em = 0.98f0,
+    def_land_em = 0.98f0,
     def_co2 = 280f0,
     rng = Random.default_rng(),
 )
@@ -43,7 +43,7 @@ function NeuralLW(
     nlayers = spectral_grid.nlayers
 
     # Calculate nn input dimension regarding given inputs
-    n_in = n_inputs(inputs, nlayers)
+    n_in = n_inputs(input_spec, nlayers)
 
     # Calculate NN output dimension
     # - output_form = :linear:  2*nlayers + 5
@@ -52,7 +52,7 @@ function NeuralLW(
 
 
     # Load zscore statistics 
-    zscore = ZScoreStats(zscore_name, inputs, output_form, nlayers)
+    zscore = ZScoreStats(zscore_name, input_spec, output_form, nlayers)
 
 
     # Create nn architecture
@@ -66,7 +66,7 @@ function NeuralLW(
     return NeuralLW(
         nn, ps, st,
         n_in, n_out, arch_config,
-        inputs, output_form, zscore,
+        input_spec, output_form, zscore,
         input_buffer,
         def_ocean_em, def_land_em, def_co2
     )
@@ -78,7 +78,7 @@ function update_ps(lw::NeuralLW, ps_new)
     return NeuralLW(
         lw.nn, ps_new, lw.st,
         lw.n_in, lw.n_out, lw.arch_config,
-        lw.inputs, lw.output_form, lw.zscore,
+        lw.input_spec, lw.output_form, lw.zscore,
         lw.input_buffer,
         lw.def_ocean_em, lw.def_land_em, lw.def_co2
     )
@@ -102,7 +102,7 @@ Base.@propagate_inbounds function SpeedyWeather.parameterization!(
 
     # Populate input buffer
     X = scheme.input_buffer
-    fill_inputs!(X, scheme.inputs, ij, vars, model, scheme)
+    fill_inputs!(X, scheme.input_spec, ij, vars, model, scheme)
 
 
     # Normalize input variables
@@ -131,7 +131,7 @@ info_scheme(s::NeuralLW) = (;
     n_out        = s.n_out,
     info_arch(s.arch_config)...,
 
-    inputs       = collect(string.(keys(s.inputs))),
+    inputs       = collect(string.(keys(s.input_spec))),
     output_form  = string(nameof(typeof(s.output_form))),
     zscore_stats = s.zscore.zscore_name,
 

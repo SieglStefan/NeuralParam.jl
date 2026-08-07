@@ -79,7 +79,7 @@ function make_samples(form = LinearOutput(); npoints = 4, nlayers = 2, nsamples 
             lf = scal(), sst = Ts, lst = Ts, Ts = Ts,
         # targets, built from the predictors with the coefficients above
             dT   = co.a .* P .+ co.b,
-            olw  = co.c .+ co.d .* P[:, NeuralParam.olw_layer(nlayers), :] .+ co.e .* Ps,
+            olw  = co.c .+ co.d .* P[:, NeuralParam.mid_layer(nlayers), :] .+ co.e .* Ps,
             slwd = co.f .+ co.g .* P[:, nlayers, :],
     )
 
@@ -206,7 +206,7 @@ try
         @test output_group(LinearOutput()) === :linear
         @test output_group(PlanckOutput()) === :planck
 
-        @test NeuralParam.olw_layer(NLAYERS) == NLAYERS ÷ 2
+        @test NeuralParam.mid_layer(NLAYERS) == NLAYERS ÷ 2
         @test NeuralParam.predictor(LinearOutput(), Float32[2, 3]) == Float32[2, 3]
         @test NeuralParam.predictor(PlanckOutput(), Float32[2, 3]) == Float32[16, 81]
     end
@@ -217,7 +217,7 @@ try
         n     = 2
         Y     = Float32[2, 3,  10, 20,  1, 0.5, 0.25,  7, 2]
         state = (; T_prof = Float32[100, 200], Ts = 300f0, nlayers = n)
-        k_olw = NeuralParam.olw_layer(n)
+        k_olw = NeuralParam.mid_layer(n)
 
         dTdt = zeros(Float32, n)
         olw, slwd = NeuralParam.decode!(LinearOutput(), dTdt, Y, state)

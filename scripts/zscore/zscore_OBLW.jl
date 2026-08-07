@@ -30,7 +30,7 @@ SG = SpectralGrid(trunc=TRUNC, nlayers=NLAYERS)
 
 ### Define parameters for sampling
 # General
-NAME        = "zscore_oblw_layer_4"     # name of statistics
+NAME        = "zscore_OBLW_default"     # name of statistics
 SEED        = 1234                      # seed used
 
 # Sampling
@@ -46,9 +46,6 @@ FAC_PERT_Q  = 0.2f0                     # humidity perturbation amplitude (multi
 
 # Output forms: one stats group is fitted per form, keyed by output_group(form)
 OUTPUT_FORMS = (DirectOutput(), LinearOutput(), PlanckOutput())
-
-# Diagnostics
-N_SUB       = 200                       # number of columns stored for regression plots
 
 # Surface emissivity
 EM_OCEAN    = 0.98f0
@@ -69,26 +66,31 @@ LW_SCHEME   = OneBandLongwave(SG;
 # Create output folder
 DIR = prepare_out_dir(stats_dir(), NAME)
 
+# Set seed for reproducability
+Random.seed!(SEED)
 
 
-### Generate the zscore statistics
-zs = generate_zscore(
-    SG;
-    name        = NAME,
-    dir         = DIR,
-    seed        = SEED,
-    model        = MODEL,
-    lw_scheme    = LW_SCHEME,
-    output_forms = OUTPUT_FORMS,
-    t_spinup    = T_SPINUP,
-    start_date  = START_DATE,
-    n_ic        = N_IC,
-    sim_time    = SIM_TIME,
-    sample_gap  = SAMPLE_GAP,
-    fac_pert_T  = FAC_PERT_T,
-    fac_pert_q  = FAC_PERT_Q,
-    n_sub       = N_SUB,
-    do_plots    = true,
+
+### Generate zscore statistics
+zs = generate_zscore(;
+    spectral_grid   = SG,
+    name            = NAME,
+    dir             = DIR,
+    seed            = SEED,
+
+    model           = MODEL,
+    lw_scheme       = LW_SCHEME,
+
+    output_forms    = OUTPUT_FORMS,
+
+    t_spinup        = T_SPINUP,
+    start_date      = START_DATE,
+    n_ic            = N_IC,
+    sim_time        = SIM_TIME,
+    sample_gap      = SAMPLE_GAP,
+
+    fac_pert_T      = FAC_PERT_T,
+    fac_pert_q      = FAC_PERT_Q,
 )
 
 
@@ -135,7 +137,6 @@ write_info(;
         n_ic       = N_IC,
         sim_time   = SIM_TIME,
         sample_gap = SAMPLE_GAP,
-        n_sub      = N_SUB,
     ),
 
     perturbation = (;

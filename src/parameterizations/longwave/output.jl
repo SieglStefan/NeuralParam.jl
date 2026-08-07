@@ -1,8 +1,8 @@
 ### Output functions
 ###
 ### Utility functions for handling scheme outputs. 
-### - a new output form needs five methods, all defined here:
-###     n_outputs, output_group, output_keys, decode!, output_stats
+### - a new output form needs six methods, all defined here:
+###     n_outputs, output_group, output_keys, decode!, predictor, output_stats
 
 
 
@@ -33,7 +33,7 @@ output_keys(::PlanckOutput) = (:a, :b, :c, :d, :e, :f, :g)      # dT: a(1:n), b(
 ### Decoding
 
 # Layer whose temperature the olw coefficients use (also used in stats generation)
-olw_layer(nlayers) = nlayers ÷ 2
+mid_layer(nlayers) = nlayers ÷ 2
 
 
 # Define decodings of output vector Y
@@ -59,7 +59,7 @@ end
     end
 
     # Accumulate fluxes
-    olw  = Y[2*nlayers+1] + Y[2*nlayers+2]*T_prof[olw_layer(nlayers)] + Y[2*nlayers+3]*Ts
+    olw  = Y[2*nlayers+1] + Y[2*nlayers+2]*T_prof[mid_layer(nlayers)] + Y[2*nlayers+3]*Ts
     slwd = Y[2*nlayers+4] + Y[2*nlayers+5]*T_prof[nlayers]
 
     return olw, slwd
@@ -75,7 +75,7 @@ end
     end
 
     # Accumulate fluxes
-    olw  = Y[2*nlayers+1] + Y[2*nlayers+2]*T_prof[olw_layer(nlayers)]^4 + Y[2*nlayers+3]*Ts^4
+    olw  = Y[2*nlayers+1] + Y[2*nlayers+2]*T_prof[mid_layer(nlayers)]^4 + Y[2*nlayers+3]*Ts^4
     slwd = Y[2*nlayers+4] + Y[2*nlayers+5]*T_prof[nlayers]^4
 
     return olw, slwd
@@ -86,9 +86,6 @@ end
 ### Writing
 
 # Assemble the state a decode! reads from
-#   - one place to add a quantity, no output form or scheme signature changes
-#   - only holds quantities that are read here anyway; adding a prognostic one (e.g. humidity)
-#     pulls it into the AD tape, so re-check the gradients after such a change
 @inline function lw_state(ij, vars, model, scheme)
 
     nlayers = model.spectral_grid.nlayers
@@ -147,22 +144,22 @@ predictor(::LinearOutput, x) = x
 predictor(::PlanckOutput, x) = x.^4
 
 
-# Shared fit for affine output forms (dT = a*P(T) + b, olw = c + d*P(T[olw_layer]) + e*P(Ts),
+# Shared fit for affine output forms (dT = a*P(T) + b, olw = c + d*P(T[mid_layer]) + e*P(Ts),
 #                                     slwd = f + g*P(T[nlayers])), fitted per column
-function affine_stats(form, s)
+function affine_stats(output_form, samples)
 
-    npoints, nlayers, _ = size(s.T)
+    npoints, nlayers, _ = size(samples.T)
 
     # Transform the predictors of the output form (LinearOutput: T, PlanckOutput: T^4)
-    T  = predictor(form, s.T)
-    Ts = predictor(form, s.Ts)
+    T  = predictor(output_form, samples.T)
+    Ts = predictor(output_form, samples.Ts)
 
     # Temperature tendency coefficients, one fit per column and layer
     a = zeros(Float32, npoints, nlayers)
     b = zeros(Float32, npoints, nlayers)
 
     for ij in 1:npoints, k in 1:nlayers
-        b[ij,k], a[ij,k] = fit_linear(view(T, ij, k, :), view(s.dT, ij, k, :))
+        b[ij,k], a[ij,k] = fit_linear(view(T, ij, k, :), view(samples.dT, ij, k, :))
     end
 
     # Flux coefficients, one fit per column
@@ -170,8 +167,8 @@ function affine_stats(form, s)
     f = zeros(Float32, npoints); g = zeros(Float32, npoints)
 
     for ij in 1:npoints
-        c[ij], d[ij], e[ij] = fit_linear(view(T, ij, olw_layer(nlayers), :), view(Ts, ij, :), view(s.olw, ij, :))
-        f[ij], g[ij]        = fit_linear(view(T, ij, nlayers, :), view(s.slwd, ij, :))
+        c[ij], d[ij], e[ij] = fit_linear(view(T, ij, mid_layer(nlayers), :), view(Ts, ij, :), view(samples.olw, ij, :))
+        f[ij], g[ij]        = fit_linear(view(T, ij, nlayers, :), view(samples.slwd, ij, :))
     end
 
     return (;
@@ -183,14 +180,11 @@ end
 
 
 # Define zscore statistics of the output coefficients, one method per output form
-#   - the returned keys must be exactly output_keys(form), in the order decode! expects
-#   - s holds every sampled input (T, q, p, lat, lf, sst, lst, Ts) and target (dT, olw, slwd),
-#     so a new form can regress on whatever it needs
-output_stats(::DirectOutput, s) = (;
-    dT   = mean_std_layers(s.dT),
-    olw  = mean_std(s.olw),
-    slwd = mean_std(s.slwd),
+output_stats(::DirectOutput, samples) = (;
+    dT   = mean_std_layers(samples.dT),
+    olw  = mean_std(samples.olw),
+    slwd = mean_std(samples.slwd),
 )
 
-output_stats(f::LinearOutput, s) = affine_stats(f, s)
-output_stats(f::PlanckOutput, s) = affine_stats(f, s)
+output_stats(output_form::LinearOutput, samples) = affine_stats(output_form, samples)
+output_stats(output_form::PlanckOutput, samples) = affine_stats(output_form, samples)

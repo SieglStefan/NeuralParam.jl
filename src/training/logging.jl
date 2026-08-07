@@ -55,12 +55,12 @@ end
 
 
 # Function for calculating metrics (losses, norms, bias,...) for logging
-function compute_metrics(lw_train, rc, sims, grads)
+function compute_metrics(lw_train, tc, sims, grads)
     
     # Unpack loss weights, field normalizations and grid weights
-    w = rc.loss_config.weights
-    fn = rc.loss_config.field_norm
-    gw = rc.loss_config.grid_weights
+    w = tc.loss_config.weights
+    fn = tc.loss_config.field_norm
+    gw = tc.loss_config.grid_weights
 
 
     # Target fields
@@ -119,25 +119,25 @@ end
 
 
 # Print information about the run configuration
-function print_config(rc, dt_sec)
+function print_config(tc, dt_sec)
 
     # single time step in days
     dt_day = dt_sec /3600 /24
 
     # Total updates per training
-    up_total = rc.n_ic * rc.n_traj ÷ rc.n_batch
+    up_total = tc.n_ic * tc.n_traj ÷ tc.n_batch
 
     # Batch window and gap size in days
-    t_batch = rc.n_batch * dt_day
-    t_gap = rc.n_gap * dt_day
+    t_batch = tc.n_batch * dt_day
+    t_gap = tc.n_gap * dt_day
 
     # Min. and max. length of single gradient trajectory in days
-    t_grad_start = rc.n_steps_0 * dt_day
-    t_grad_end = (rc.n_steps_0 + rc.n_steps_inc * (rc.n_ic-1)) * dt_day
+    t_grad_start = tc.n_steps_0 * dt_day
+    t_grad_end = (tc.n_steps_0 + tc.n_steps_inc * (tc.n_ic-1)) * dt_day
 
     # Total training period per IC in days
-    t_train_start = rc.n_traj * (t_grad_start + t_gap)
-    t_train_end = rc.n_traj * (t_grad_end + t_gap)
+    t_train_start = tc.n_traj * (t_grad_start + t_gap)
+    t_train_end = tc.n_traj * (t_grad_end + t_gap)
 
     # Print information
     println("----------Training run configuration:----------")

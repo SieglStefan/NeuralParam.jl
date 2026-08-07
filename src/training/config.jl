@@ -1,13 +1,12 @@
 ### Configuration files for training a parameterization
 ###
 ### Contains:
-###     - RunConfig:    contains parameters for a training run
-###     - OutputConfig: contains parameters for outputs of the training
+###     - TrainConfig:    contains parameters for a training run
 
 
 
 # Struct holding training run configuration parameters
-@kwdef struct RunConfig
+@kwdef struct TrainConfig
     seed::Int = 1234                                    # seed for RNG
     name::String = "default"                            # name of the training run
     dir::String = "default"                             # directory for storing training runs
@@ -17,7 +16,7 @@
 
     eta0::Float32 = 1f-2                                # initial learning rate
     eta_decay::Float32 = 0.8f0                          # learning rate decay after an ic
-    loss_config::Union{Nothing, LossConfig} = nothing   # weighting and normalization of the loss
+    loss_config::LossConfig                             # weighting and normalization of the loss
 
     t_spinup::Period = Day(30)                          # spinup time before training
     start_date::DateTime = DateTime(2000, 1, 1)         # start date of simulation

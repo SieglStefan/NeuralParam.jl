@@ -5,27 +5,27 @@
 
 
 # Gradient computation wrapper allowing do_autodiff=false testmode
-function compute_gradients(rc, sims, vars0, n_steps)
+function compute_gradients(tc, sims, vars0, n_steps)
 
     # Test mode: return zero gradients, without Enzyme ever being reached
-    if !rc.do_autodiff
+    if !tc.do_autodiff
         return make_zero(sims.train.model.longwave_radiation.ps)
     end
 
     # Normal mode: call Enzyme.autodiff
-    return Base.invokelatest(autodiff_gradients, rc, sims, vars0, n_steps)
+    return Base.invokelatest(autodiff_gradients, tc, sims, vars0, n_steps)
 end
 
 
 # Gradient computation over a n_steps trajectory using Enzyme
-@noinline function autodiff_gradients(rc, sims, vars0, n_steps)
+@noinline function autodiff_gradients(tc, sims, vars0, n_steps)
 
     # Create adjoint vars from reference variables vars0
     vars_ad = deepcopy(sims.train.variables)
     copy!(vars_ad, vars0)
 
     # Calculate loss and seed AD with dL/dT
-    bvars_ad = seed_loss!(rc, sims, vars_ad)
+    bvars_ad = seed_loss(tc, sims, vars_ad)
 
 
     # Copy training model and seed model gradient container with zeros

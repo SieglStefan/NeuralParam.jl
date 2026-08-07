@@ -22,22 +22,22 @@ SG = SpectralGrid(trunc = TRUNC, nlayers = NLAYERS)
 ### Define possible variants for calibration
 variants = [
 
-    # 0: AD smoke test — few updates and short gradient trajectories,
-    #    just enough to see the loss move and confirm the adjoint runs
-    (;  name        = "CLLW_test_ad",
-        output_form = LinearOutput(),
-        t_spinup    = Day(10),
+    # Test variant for quick testing                                    # 0: test
+    (;  
+        name        = "TEST_CLW",
+        t_spinup    = Day(1),
         n_ic        = 2,
         n_traj      = 10,
         n_batch     = 2,
         n_steps_0   = 5,
         n_steps_inc = 2,
-        n_gap       = 20,
+        n_gap       = 5,
     ),
 
     # Default ConstLW
-    (;  name = "default_linear", output_form = LinearOutput()),     # 1: linear output
-    (;  name = "default_direct", output_form = DirectOutput()),     # 2: direct output
+    (;  name = "CLLW_direct_default", output_form = DirectOutput()),    # 1: direct output
+    (;  name = "CLLW_linear_default", output_form = LinearOutput()),    # 2: linear output
+    (;  name = "CLLW_planck_default", output_form = PlanckOutput()),    # 3: planck output
 ]
 
 # Get task number and choose task
@@ -53,7 +53,7 @@ SEED        = get(v, :seed, 42)
 
 # Scheme
 OUTPUT_FORM = get(v, :output_form, LinearOutput())
-ZSCORE      = get(v, :zscore_name, "zscore_oblw_layer_4")
+ZSCORE      = get(v, :zscore_name, "zscore_OBLW_default")
 
 # Surface emissivity
 EM_OCEAN    = get(v, :em_ocean, 0.98f0)
@@ -104,47 +104,53 @@ Random.seed!(SEED)
 
 ### Calibration
 # Define to be calibrated scheme
-scheme = ConstLW(
-    SG, 
-    OUTPUT_FORM, 
-    ZSCORE; 
-    def_ocean_em = EM_OCEAN, 
-    def_land_em = EM_LAND
+lw_train = ConstLW(
+    spectral_grid = SG, 
+    output_form   = OUTPUT_FORM, 
+    zscore_name   = ZSCORE; 
+    def_ocean_em  = EM_OCEAN, 
+    def_land_em   = EM_LAND
 )
 
 # Define loss config
 loss_config = LossConfig(
-    SG,
-    ZSCORE;
-    weights = WEIGHTS,
+    spectral_grid = SG, 
+    zscore_name   = ZSCORE,
+    weights       = WEIGHTS,
 )
 
 # Define run configuration
-run_config = RunConfig(
+train_config = TrainConfig(
     seed        = SEED,
     name        = NAME,
     dir         = DIR,
+
     model       = MODEL,
     lw_target   = LW_TARGET,
+
     eta0        = ETA0,
     eta_decay   = ETA_DECAY,
     loss_config = loss_config,
+
     t_spinup    = T_SPINUP,
     start_date  = START_DATE,
+
     n_ic        = N_IC,
     n_traj      = N_TRAJ,
     n_batch     = N_BATCH,
     n_steps_0   = N_STEPS_0,
     n_steps_inc = N_STEPS_INC,
     n_gap       = N_GAP,
+    
     fac_pert_T  = FAC_PERT_T,
     fac_pert_q  = FAC_PERT_Q,
-    do_autodiff = false,
+    
+    do_autodiff = true,
 )
 
 
 # Run the calibration
-lw_trained = fetch(schedule(Task(() -> run_training(SG, scheme, run_config), 1<<29)))
+lw_trained = fetch(schedule(Task(() -> run_training(SG, lw_train, train_config), 1<<29)))
 
 
 # Create and store info.toml file

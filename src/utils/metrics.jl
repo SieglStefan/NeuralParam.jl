@@ -7,7 +7,7 @@
 # Root mean squared error
 rmse(x, y) = sqrt(sum(abs2, x .- y) / length(x))
 # Bias
-bias(x, y) = sum(y .- x) / length(x)
+bias(x, y) = sum(x .- y) / length(x)
 
 # Weighted metrics
 wmean(x, w) = sum(w .* x) / length(x)
@@ -18,28 +18,26 @@ wbias(x, y, w) = wmean(x .- y, w)
 # Correlation
 correlation(x, y) = cor(vec(x), vec(y))
 # Maximal absolute difference
-maxdiff(x, y) = maximum(abs.(y .- x))
+maxdiff(x, y) = maximum(abs.(x .- y))
 
 
 
-# Recursive squared L2 norms
-tree_l2sum(x::Number)           = abs2(x)
-tree_l2sum(x::AbstractArray)    = sum(abs2, x)
-tree_l2sum(x::Tuple)            = sum(tree_l2sum, x)
-tree_l2sum(x::NamedTuple)       = sum(tree_l2sum, values(x))
+# Extracts area weights of a grid from field
+function area_weights(spectral_grid::SpectralGrid)
+    
+    # Extract grid and angles
+    grid = spectral_grid.grid
+    Ω = get_solid_angles(grid)          # one solid angle per ring
+    rings = eachring(grid)              # point indices of every ring
 
-# Recursive L2 norm for parameter/gradient trees
-tree_l2norm(x) = sqrt(tree_l2sum(x))
+    # Prepare weights array (one entry per grid point)
+    w = zeros(Float32, spectral_grid.npoints)
 
+    # Populate weights array with solid angles
+    for (j, ring) in enumerate(rings)
+        @views w[ring] .= Ω[j]
+    end
 
-# Utility functions for adding parameter/gradient trees
-tree_add(a::Number, b::Number)                = a + b
-tree_add(a::AbstractArray, b::AbstractArray)  = a .+ b
-tree_add(a::Tuple, b::Tuple)                  = map(tree_add, a, b)
-tree_add(a::NamedTuple, b::NamedTuple)        = map(tree_add, a, b)
-
-# Utility functions for scaling parameter/gradient trees
-tree_scale(a::Number, s)        = a * s
-tree_scale(a::AbstractArray, s) = a .* s
-tree_scale(a::Tuple, s)         = map(x -> tree_scale(x, s), a)
-tree_scale(a::NamedTuple, s)    = map(x -> tree_scale(x, s), a)
+    # Normalize weights so that mean weight = 1
+    return w .* (length(w) / sum(w))
+end

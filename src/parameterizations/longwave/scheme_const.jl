@@ -19,13 +19,13 @@ struct ConstLW{P,O,Z} <: AbstractLW
 end
 
 
-# Constructor for creating Lux nn architecture and parameters
-function ConstLW(
+# Constructor for creating a ConstLW parameterization scheme
+function ConstLW(;
     spectral_grid::SpectralGrid,
     output_form,
-    zscore_name;
-    def_ocean_em = 0.92f0,
-    def_land_em = 0.92f0,
+    zscore_name,
+    def_ocean_em = 0.98f0,
+    def_land_em = 0.98f0,
     def_co2 = 280f0,
 )
   

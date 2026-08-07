@@ -23,11 +23,22 @@ SG = SpectralGrid(trunc=TRUNC, nlayers=NLAYERS)
 ### Define possible variants for reference data generation
 variants = [
 
-    # 0. Default: no longwave radiation scheme
-    (;),
+    # 0. Test variant for quick testing  
+    (;  name        = "TEST_REFERENCE",
+        t_spinup    = Day(1),
+        sim_days    = 10,
+        fac_pert_t  = 2f0,
+        fac_pert_q  = 0.2f0,
+    ),
 
-    # 1. OneBandLongwave default
-    (; name="OBLW_default", lw_scheme=OneBandLongwave(SG; transmissivity = FriersonLongwaveTransmissivity(SG))),
+    # 1. No longwave radiation scheme         
+    (;  name        = "FreeRun_default",
+        lw_scheme   = nothing,
+    ),
+
+    # 2. OneBandLongwave default                  
+    (;  name        = "OBLW_default"
+    ),
 ]
 
 # Get task number and choose task
@@ -41,15 +52,26 @@ v = variants[task+1]
 NAME       = get(v, :name, "default")           # name of the reference data
 SEED       = get(v, :seed, 1234)                # used seed
 
-# Model and scheme
-MODEL      = get(v, :model, PrimitiveWetModel)  # used model
-LW_SCHEME  = get(v, :lw_scheme, nothing)        # used longwave radiation scheme
+# Surface emissivity
+EM_OCEAN    = get(v, :em_ocean, 0.98f0)
+EM_LAND     = get(v, :em_land,  0.98f0)
+
+# Model and target scheme
+MODEL       = get(v, :model, PrimitiveWetModel)             # used model
+LW_TARGET   = OneBandLongwave(SG;                           # used longwave radiation scheme
+    transmissivity     = FriersonLongwaveTransmissivity(SG),
+    radiative_transfer = OneBandLongwaveRadiativeTransfer(SG;
+                            emissivity_ocean = EM_OCEAN,
+                            emissivity_land  = EM_LAND),
+)
+
+MODEL      = get(v, :model, PrimitiveWetModel)  
+LW_SCHEME  = get(v, :lw_scheme, LW_TARGET)        
 
 # Sampling
 T_SPINUP   = get(v, :t_spinup, Day(30))                     # spinup time in days
 START_DATE = get(v, :start_date, DateTime(2001, 1, 1))      # sampling starting date
 SIM_DAYS   = get(v, :sim_days, 2*365)                       # sampling time in days
-FULL_GAP   = get(v, :full_gap, 1)                           # store a full (restart) state every FULL_GAP days
 
 # Perturbation
 FAC_PERT_T = get(v, :fac_pert_t, 2f0)           # additive perturbation amplitude for temperature
@@ -61,22 +83,27 @@ FAC_PERT_Q = get(v, :fac_pert_q, 0.2f0)         # multiplicative perturbation am
 # Create output folder
 DIR = prepare_out_dir(reference_dir(), NAME)
 
+# Set seed for reproducability
+Random.seed!(SEED)
+
 
 
 ### Generate the reference data set
-ref = generate_reference(
-    SG;
-    name        = NAME,
-    dir         = DIR,
-    seed        = SEED,
-    model       = MODEL,
-    lw_scheme   = LW_SCHEME,
-    t_spinup    = T_SPINUP,
-    start_date  = START_DATE,
-    sim_days    = SIM_DAYS,
-    full_gap    = FULL_GAP,
-    fac_pert_T  = FAC_PERT_T,
-    fac_pert_q  = FAC_PERT_Q,
+ref = generate_reference(;
+    spectral_grid   = SG,
+    name            = NAME,
+    dir             = DIR,
+    seed            = SEED,
+
+    model           = MODEL,
+    lw_scheme       = LW_SCHEME,
+
+    t_spinup        = T_SPINUP,
+    start_date      = START_DATE,
+    sim_days        = SIM_DAYS,
+
+    fac_pert_T      = FAC_PERT_T,
+    fac_pert_q      = FAC_PERT_Q,
 )
 
 
@@ -109,7 +136,6 @@ write_info(;
         t_spinup      = string(T_SPINUP),
         start_date    = string(START_DATE),
         sim_days      = SIM_DAYS,
-        full_gap      = FULL_GAP,
         steps_per_day = ref.steps_per_day,
     ),
 

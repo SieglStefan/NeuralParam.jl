@@ -29,20 +29,7 @@ end
 @inline in_lf(X,  o, ij, vars, model, scheme) = (X[o+1] = model.land_sea_mask.land_fraction[ij]; o+1)
 @inline in_sst(X, o, ij, vars, model, scheme) = (X[o+1] = SpeedyWeather.get_prognostic_step(vars.prognostic.ocean.sea_surface_temperature, model.time_stepping, scheme)[ij]; o+1)
 @inline in_lst(X, o, ij, vars, model, scheme) = (X[o+1] = vars.prognostic.land.soil_temperature[ij,1]; o+1)
-
-@inline function in_Ts(X,  o, ij, vars, model, scheme)
-
-    sst = SpeedyWeather.get_prognostic_step(vars.prognostic.ocean.sea_surface_temperature, model.time_stepping, scheme)[ij]
-    lst = vars.prognostic.land.soil_temperature[ij,1]
-    lf  = model.land_sea_mask.land_fraction[ij]
-
-    Ts_o = ifelse(isfinite(sst), sst, lst)
-    Ts_l = ifelse(isfinite(lst), lst, sst)
-
-    X[o+1] = (1 - lf)*Ts_o + lf*Ts_l
-
-    return o+1
-end
+@inline in_Ts(X,  o, ij, vars, model, scheme) = (X[o+1] = surface_temp(ij, vars, model, scheme); o+1)
 
 
 
@@ -64,19 +51,20 @@ const INPUTS = (;
 input_spec(names::Symbol...) = NamedTuple{names}(map(n -> INPUTS[n], names))
 
 # Predefined default selection for different use-cases
-const IN_NLW_OBLW = input_spec(:T, :Ts, :lat)
+const INPUT_NLW_OBLW = input_spec(:T, :Ts, :lat)
 
 
 
 # Function for summing the length of the input vector
-n_inputs(spec, nlayers) = sum((last(e) === :profile ? nlayers : 1) for e in values(spec))
+n_inputs(input_spec, nlayers) = sum((last(e) === :profile ? nlayers : 1) for e in values(input_spec))
 
 # Function for mapping every input to its slice of the input vector, e.g. (; T = 1:8, Ts = 9:9)
-function input_layout(spec, nlayers)
+function input_layout(input_spec, nlayers)
 
     offset = 0
 
-    return map(spec) do entry
+    # Returns a vector of ranges by applying "entry -> body" to each entry of input_spec
+    return map(input_spec) do entry
 
         # Length of this input and the range it occupies
         n = last(entry) === :profile ? nlayers : 1
@@ -88,8 +76,35 @@ function input_layout(spec, nlayers)
 end
 
 # Function for filling the input buffer with the selected inputs
-@inline fill_inputs!(X, spec, ij, vars, model, scheme) =
-    foldl((o, e) -> first(e)(X, o, ij, vars, model, scheme), values(spec); init = 0)
+#   - @generated unrolls the iteration into straight-line calls at compile time.
+#     The previous foldl fetched each input function out of `spec` at runtime, which
+#     Enzyme could not resolve statically
+@generated function fill_inputs!(X, input_spec::NamedTuple{names}, ij, vars, model, scheme) where {names}
+
+    calls = [:(o = first(input_spec.$n)(X, o, ij, vars, model, scheme)) for n in names]
+
+    return quote
+        Base.@_propagate_inbounds_meta
+        o = 0
+        $(Expr(:block, calls...))
+        return o
+    end
+end
 
 
     
+# Combined surface temperature, calculated from sea and land surface temperatures and weighted by land fraction
+@inline function surface_temp(ij, vars, model, scheme)
+
+    sst = SpeedyWeather.get_prognostic_step(vars.prognostic.ocean.sea_surface_temperature, model.time_stepping, scheme)[ij]
+    lst = vars.prognostic.land.soil_temperature[ij,1]
+    lf  = model.land_sea_mask.land_fraction[ij]
+
+    Ts_o = ifelse(isfinite(sst), sst, lst)
+    Ts_l = ifelse(isfinite(lst), lst, sst)
+
+    return (1 - lf)*Ts_o + lf*Ts_l
+end
+
+
+
