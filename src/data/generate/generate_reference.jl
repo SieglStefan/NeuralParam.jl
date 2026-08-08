@@ -56,7 +56,7 @@ function generate_reference(;
     save_store(; dir, file = "reference.jld2") do store
 
         # Save the initial state (day 0)
-        store["day_0"] = sim.variables
+        store["day_0"] = SpeedyWeather.materialize_views(sim.variables)
 
         # Loop over the whole simulation
         for day in 1:sim_days
@@ -65,7 +65,7 @@ function generate_reference(;
             sim_timesteps!(sim, steps_per_day)
 
             # Save the full state — restart point and verification data in one
-            store["day_$(day)"] = sim.variables
+            store["day_$(day)"] = SpeedyWeather.materialize_views(sim.variables)
         end
 
         # Written last: their presence marks the file as complete

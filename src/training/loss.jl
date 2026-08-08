@@ -56,7 +56,7 @@ end
 
 # Struct holding loss configuration parameters
 struct LossConfig{W<:NamedTuple, F<:NamedTuple, G<:AbstractVector}
-    weights::Waterfall      # loss weighting factors
+    weights::W              # loss weighting factors
     field_norm::F           # field normalization factors (zscore)
     grid_weights::G         # grid area weights
 end

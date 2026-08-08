@@ -67,12 +67,30 @@ end
 
 ### Regression diagnostics
 
-# Thin several equally long vectors down to at most max_pts points (shared selection)
-function thin(max_pts, vecs...)
-    n = length(first(vecs))
-    n <= max_pts && return vecs
-    sel = randperm(n)[1:max_pts]
-    return map(v -> v[sel], vecs)
+# Shared random subset of indices, so every panel of a figure shows the SAME points
+#   - with replacement: fine for a scatter, and O(max_pts) instead of randperm's O(n)
+#     on the ~10^6 points a full stats run produces
+thin_idx(n, max_pts) = n <= max_pts ? (1:n) : rand(1:n, max_pts)
+
+
+# One scatter panel with its fitted line and the fraction of variance the line explains
+#   - `line` is a function of the predictor, so each panel supplies its own fit
+function regression_panel!(pos, x, y, line; xlabel, ylabel, title)
+
+    ax = CairoMakie.Axis(pos; xlabel, ylabel, title, titlesize = 12)
+    CairoMakie.scatter!(ax, x, y; markersize = 2, alpha = 0.2)
+
+    # Fitted line of the column-mean coefficients
+    xr = range(extrema(x)...; length = 2)
+    CairoMakie.lines!(ax, xr, line.(xr); color = :red)
+
+    # R² of the column-MEAN line against the pooled scatter — not expected to be near 1,
+    # it is meant for comparing output forms (linear vs planck) on the same field
+    r2 = 1 - sum(abs2, y .- line.(x)) / sum(abs2, y .- mean(y))
+    CairoMakie.text!(ax, 0.03, 0.97; text = "R² = $(round(r2, digits = 3))",
+                     space = :relative, align = (:left, :top), fontsize = 10)
+
+    return ax
 end
 
 
@@ -85,17 +103,19 @@ function plot_regression_dT(samples, lin, form = LinearOutput(); ncols = 4, max_
     # Plot against the predictor the coefficients were fitted on
     P = predictor(form, samples.T)
 
+    # One shared subset for every layer, so the panels are comparable
+    idx = thin_idx(Base.size(P, 1) * Base.size(P, 3), max_pts)
+
     for k in 1:nlayers
         r, c = fldmod1(k, ncols)
-        ax = CairoMakie.Axis(fig[r, c]; xlabel = "P(T)", ylabel = "dT (K/s)", title = "Layer $k")
-
-        x, y = thin(max_pts, vec(P[:,k,:]), vec(samples.dT[:,k,:]))
-        CairoMakie.scatter!(ax, x, y; markersize = 2, alpha = 0.2)
 
         # Line uses the column-MEAN coefficients, the scatter pools all columns,
         # so a spread around the line is expected — it is not a bad fit
-        xr = range(extrema(x)...; length = 2)
-        CairoMakie.lines!(ax, xr, lin.a.mean[k] .+ lin.b.mean[k].* (xr .- lin.center.T[k]); color = :red)
+        a, b = lin.a.mean[k], lin.b.mean[k]
+
+        regression_panel!(fig[r, c], vec(P[:,k,:])[idx], vec(samples.dT[:,k,:])[idx],
+            x -> a + b*(x - lin.center.T[k]);
+            xlabel = "P(T)", ylabel = "dT (K/s)", title = "Layer $k")
     end
 
     CairoMakie.Label(fig[0, :],
@@ -104,56 +124,59 @@ function plot_regression_dT(samples, lin, form = LinearOutput(); ncols = 4, max_
 end
 
 
-# Both flux regressions in one figure:
-#   olw  = c + d*P(T[mid_layer]) + e*P(Ts)  two predictors, one panel each with the other held at its mean
-#   slwd = f + g*P(T[nlayers])              one predictor, plain scatter with its line
+# Both flux regressions in one figure, as PARTIAL residuals:
+#   olw = c + d*(P(T[mid]) - P̄mid) + e*(P(Ts) - P̄s)
+#     -> panel 1 plots olw minus the e-term, panel 2 olw minus the d-term, so the red
+#        line is the only thing left to explain the scatter.
+#        Plotting raw olw makes the line look far too shallow: the cloud shows the TOTAL
+#        dependence (T[mid] and Ts co-vary strongly), the line only the PARTIAL one.
+#   slwd = f + g*(P(T[nlayers]) - P̄[nlayers])    single predictor, nothing to subtract
 function plot_regression_flux(samples, lin, form = LinearOutput(); max_pts = 5000)
 
     nlayers = Base.size(samples.T, 2)
+    mid     = mid_layer(nlayers)
 
-    # Plot against the predictors the coefficients were fitted on
+    # Predictors the coefficients were fitted on
     #   - transform once: predictor() copies the whole profile array
     P  = predictor(form, samples.T)
-    T1 = P[:, mid_layer(nlayers), :]                         # olw layer temperature
-    Tb = P[:, nlayers, :]                                    # bottom-layer temperature
-    Ts = predictor(form, samples.Ts)                         # surface temperature
+    T1 = vec(P[:, mid, :])                      # mid-layer temperature
+    Tb = vec(P[:, nlayers, :])                  # bottom-layer temperature
+    Ts = vec(predictor(form, samples.Ts))       # surface temperature
 
-    # Column-mean coefficients — what ConstLW starts from
+    olw  = vec(samples.olw)
+    slwd = vec(samples.slwd)
+
+    # Column-mean coefficients and predictor centers — what ConstLW starts from
     c, d, e = lin.c.mean[1], lin.d.mean[1], lin.e.mean[1]
     f, g    = lin.f.mean[1], lin.g.mean[1]
     cT, cTs = lin.center.T, lin.center.Ts[1]
-    mid     = mid_layer(nlayers)
 
-    fig = CairoMakie.Figure(size = (1050, 340))
+    # One shared subset for every panel, so features can be cross-referenced
+    idx = thin_idx(length(olw), max_pts)
 
-    # (1) olw vs T[mid_layer], with Ts held at its mean so a line can be drawn
-    ax1 = CairoMakie.Axis(fig[1,1]; xlabel = "P(T[$(mid_layer(nlayers))])", ylabel = "olw (W/m²)",
-                          title = "olw vs mid-layer T")
-    x, y = thin(max_pts, vec(T1), vec(samples.olw))
-    CairoMakie.scatter!(ax1, x, y; markersize = 2, alpha = 0.2)
-    xr = range(extrema(x)...; length = 2)
-    CairoMakie.lines!(ax1, xr, c .+ d .* (xr .- cT[mid]) .+ e * (mean(Ts) - cTs); color = :red)
+    fig = CairoMakie.Figure(size = (1200, 380))
 
-    # (2) olw vs Ts, with T[mid_layer] held at its mean
-    ax2 = CairoMakie.Axis(fig[1,2]; xlabel = "P(Ts)", ylabel = "olw (W/m²)",
-                          title = "olw vs surface T")
-    x, y = thin(max_pts, vec(Ts), vec(samples.olw))
-    CairoMakie.scatter!(ax2, x, y; markersize = 2, alpha = 0.2)
-    xr = range(extrema(x)...; length = 2)
-    CairoMakie.lines!(ax2, xr, c .+ d * (mean(T1) - cT[mid]) .+ e .* (xr .- cTs); color = :red)
+    # (1) olw against mid-layer T, with the Ts contribution removed
+    regression_panel!(fig[1,1], T1[idx], (olw .- e .* (Ts .- cTs))[idx],
+        x -> c + d*(x - cT[mid]);
+        xlabel = "P(T[$mid])", ylabel = "olw - e*(P(Ts)-P̄s)  [W/m²]",
+        title  = "olw vs mid-layer T")
 
-    # (3) slwd vs T[nlayers], only one predictor
-    ax3 = CairoMakie.Axis(fig[1,3]; xlabel = "P(T[nlayers])", ylabel = "slwd (W/m²)",
-                          title = "slwd vs bottom-layer T")
-    x, y = thin(max_pts, vec(Tb), vec(samples.slwd))
-    CairoMakie.scatter!(ax3, x, y; markersize = 2, alpha = 0.2)
-    xr = range(extrema(x)...; length = 2)
-    CairoMakie.lines!(ax3, xr, f .+ g .* (xr .- cT[nlayers]); color = :red)
+    # (2) olw against surface T, with the T[mid] contribution removed
+    regression_panel!(fig[1,2], Ts[idx], (olw .- d .* (T1 .- cT[mid]))[idx],
+        x -> c + e*(x - cTs);
+        xlabel = "P(Ts)", ylabel = "olw - d*(P(T[mid])-P̄mid)  [W/m²]",
+        title  = "olw vs surface T")
+
+    # (3) slwd against bottom-layer T — single predictor, nothing to subtract
+    regression_panel!(fig[1,3], Tb[idx], slwd[idx],
+        x -> f + g*(x - cT[nlayers]);
+        xlabel = "P(T[nlayers])", ylabel = "slwd  [W/m²]",
+        title  = "slwd vs bottom-layer T")
 
     CairoMakie.Label(fig[0, :],
-        "$(nameof(typeof(form))): olw = c + d * (P(T[mid]) - P̄[mid]) + e * (P(Ts) - P̄s)          " *
-        "slwd = f + g * (P(T[nlayers]) - P̄[nlayers])        (red: column-mean coefficients)";
-        fontsize = 15, font = :bold)
+        "$(nameof(typeof(form))) — partial residuals, red: column-mean coefficients";
+        fontsize = 13, font = :bold)
     return fig
 end
 

@@ -192,7 +192,7 @@ function plot_metrics_norm(; dir="", file="", weights=nothing, plot_kwargs = (;)
     Plots.hline!(p3, [0]; color = :black, ls = :dash, lw = 1, label = "")
     Plots.vline!(p3, bounds; color = :gray, ls = :dot, lw = 1, label = "")
 
-    defaults = (; size = (700, 900), left_margin = 8Plots.mm)
+    defaults = (; size = (900, 900), left_margin = 8Plots.mm, legend = :outertopright)
 
     return Plots.plot(p1, p2, p3; layout = (3, 1), merge(defaults, plot_kwargs)...)
 end
@@ -221,6 +221,6 @@ function plot_metrics_raw(;  dir="", file="", plot_kwargs = (;))
     Plots.plot!(p2, df.bias_C; lw = 2, label = "bias C (= -olw -slwd)", color = :black, ls = :dot)
     Plots.vline!(p2, bounds; color = :gray, ls = :dot, lw = 1, label = "")
 
-    defaults = (; size = (700, 600), left_margin = 8Plots.mm)
+    defaults = (; size = (900, 600), left_margin = 8Plots.mm, legend = :outertopright)
     return Plots.plot(p1, p2; layout = (2, 1), merge(defaults, plot_kwargs)...)
 end

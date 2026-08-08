@@ -35,7 +35,7 @@ SEED        = 1234                      # seed used
 # Sampling
 T_SPINUP    = Day(30)                   # spinup time
 START_DATE  = DateTime(2000, 1, 1)      # start date of simulation
-N_IC        = 1                         # number of initial conditions
+N_IC        = 3                         # number of initial conditions
 SIM_TIME    = 365                       # sampling time in days
 SAMPLE_GAP  = 3.65                      # days between sampling
 

@@ -169,7 +169,7 @@ function generate_rollout(;
             # Keep the full fields of one trajectory for the heatmaps
             if i == heatmap_traj
                 heatmap_states = map(fields -> [fields[d+1] for d in heatmap_days], traj)
-                heatmap_ref    = map(probe -> [probe(ref[s + d]) for d in heatmap_days], probes)
+                heatmap_ref = map(probe -> [copy(probe(ref[s + d])) for d in heatmap_days], probes)
             end
 
             @info "Trajectory $i/$(n_traj) (start day $s) finished!"

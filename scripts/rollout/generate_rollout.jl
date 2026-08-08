@@ -46,12 +46,12 @@ variants = [
 
     ### 0. Test variant
     (;  name            = "TEST_ROLLOUT",
-        scheme          = ZeroLW(),
-        reference       = REF_OBLW,
-        max_horizon     = 10,
+        scheme          = "TEST_NLW",
+        reference       = "TEST_REFERENCE",
+        max_horizon     = 5,
         n_traj          = 2,
-        rollout_t       = 20,
-        heatmap_days    = [1,10],
+        rollout_t       = 5,
+        heatmap_days    = [0,1],
         heatmap_traj    = 1,
     ),
 

@@ -1,0 +1,66 @@
+[general]
+created = 2026-08-08T17:29:07.903Z
+julia = "1.10.11"
+name = "TEST_NLW"
+seed = 42
+sw_vers = "0.21.1+DEV"
+
+[grid]
+grid_type = "OctahedralGaussianGrid"
+nlayers = 8
+trunc = 31
+
+[learning_rate]
+eta0 = 0.0010000000474974513
+eta_decay = 0.699999988079071
+
+[loss]
+zscore = "zscore_OBLW_default"
+
+    [loss.weights]
+    T = 1.0
+    olw = 1.0
+    slwd = 1.0
+
+[model_type]
+emissivity_land = 0.9800000190734863
+emissivity_ocean = 0.9800000190734863
+lw_target = "OneBandLongwave"
+model = "PrimitiveWetModel"
+
+[perturbation]
+fac_pert_T = 2.0
+fac_pert_q = 0.20000000298023224
+
+[scheme]
+act = "tanh"
+inputs = ["T", "Ts", "lat"]
+n_hidden = 2
+output_form = "LinearOutput"
+width = 32
+
+[steps]
+n_batch = 2
+n_gap = 5
+n_ic = 2
+n_steps_0 = 5
+n_steps_inc = 2
+n_traj = 10
+
+[trained_scheme.scheme]
+act = "tanh"
+def_co2 = 280.0
+def_land_em = 0.9800000190734863
+def_ocean_em = 0.9800000190734863
+inputs = ["T", "Ts", "lat"]
+n_hidden = 2
+n_in = 10
+n_out = 21
+output_form = "LinearOutput"
+scheme = "NeuralLW"
+width = 32
+zscore_stats = "zscore_OBLW_default"
+
+[training_time]
+start_date = "2000-01-01T00:00:00"
+t_spinup = "1 day"

@@ -1,0 +1,25 @@
+[general]
+created = 2026-08-08T17:39:02.678Z
+julia = "1.10.11"
+name = "TEST_ROLLOUT"
+sw_vers = "0.21.1+DEV"
+
+[grid]
+grid_type = "OctahedralGaussianGrid"
+nlayers = 8
+trunc = 31
+
+[rollout]
+metrics = ["rmse", "bias", "maxdiff", "mean"]
+model = "PrimitiveWetModel"
+probes = ["T", "olw", "slwd", "slwu"]
+reference = "TEST_REFERENCE"
+scheme = "TEST_NLW"
+
+[sampling]
+heatmap_days = [0, 1]
+heatmap_traj = 1
+max_horizon = 5
+n_traj = 2
+rollout_t = 5
+start_days = [0, 2]
