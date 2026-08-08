@@ -13,7 +13,7 @@ function setup_optimiser(tc; ps)
     # Setup Optimiser rule
     rule = Optimisers.OptimiserChain(
         Optimisers.ClipNorm(1f0),           # ClipNorm for stability (limits gradients)
-        Optimisers.WeightDecay(1f-4),       # WeightDecay for stability (limits parameters)
+        Optimisers.WeightDecay(1f-2),       # WeightDecay for stability (limits parameters)
         Optimisers.Adam(eta),               # Adam optimiser with learning rate eta
     )
 
@@ -64,7 +64,7 @@ function prepare_reference(sim_template, tc, n_steps, start_date)
 
     # Initialize reference trajectory and do a first step
     steps = tc.n_traj * (tc.n_gap + n_steps) + 1
-    first_steps!(sim_ref, steps=steps)
+    first_steps!(sim_ref, planned_steps=steps)
 
     return sim_ref
 end
@@ -72,12 +72,12 @@ end
 
 
 # Samples starting dates uniformly across a year
-function sample_start_date(ic, n_ic; year=2000, rng = Random.default_rng())
+function sample_start_date(ic, n_ic; start = DateTime(2000, 1, 1), rng = Random.default_rng())
     
     # Calculate bin size and sample a day within the bin
     bin = 365 /n_ic
     day = (ic-1)*bin + rand(rng)*bin
 
     # Return sampled day
-    return DateTime(year, 1, 1) + Day(floor(Int, day))
+    return start + Day(floor(Int, day))
 end

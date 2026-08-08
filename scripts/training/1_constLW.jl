@@ -22,9 +22,8 @@ SG = SpectralGrid(trunc = TRUNC, nlayers = NLAYERS)
 ### Define possible variants for calibration
 variants = [
 
-    # Test variant for quick testing                                    # 0: test
-    (;  
-        name        = "TEST_CLW",
+    # Test variant for quick testing                                    # 0: test quick
+    (;  name        = "TEST_CLW",
         t_spinup    = Day(1),
         n_ic        = 2,
         n_traj      = 10,
@@ -34,10 +33,22 @@ variants = [
         n_gap       = 5,
     ),
 
+    # Identity test - must provide zeros in parameters and loss         # 1: identity test
+    (;  name = "TEST_IDENTITY",
+        eta0 = 0f0,
+        t_spinup    = Day(1),
+        n_ic        = 2,
+        n_traj      = 10,
+        n_batch     = 2,
+        n_steps_0   = 2,
+        n_steps_inc = 1,
+        n_gap       = 5,
+    ),
+
     # Default ConstLW
-    (;  name = "CLLW_direct_default", output_form = DirectOutput()),    # 1: direct output
-    (;  name = "CLLW_linear_default", output_form = LinearOutput()),    # 2: linear output
-    (;  name = "CLLW_planck_default", output_form = PlanckOutput()),    # 3: planck output
+    (;  name = "CLLW_direct_default", output_form = DirectOutput()),    # 2: direct output
+    (;  name = "CLLW_linear_default", output_form = LinearOutput()),    # 3: linear output
+    (;  name = "CLLW_planck_default", output_form = PlanckOutput()),    # 4: planck output
 ]
 
 # Get task number and choose task
@@ -95,7 +106,8 @@ FAC_PERT_Q  = get(v, :fac_pert_q, 0.2f0)
 
 ### Prepare calibration
 # Create output folder
-DIR = fresh_out_dir(scheme_dir(), NAME)
+out_dir = startswith(NAME, "TEST") ? fresh_out_dir : prepare_out_dir
+DIR = out_dir(scheme_dir(), NAME)
 
 # Set seed for reproducability
 Random.seed!(SEED)
@@ -111,6 +123,10 @@ lw_train = ConstLW(
     def_ocean_em  = EM_OCEAN, 
     def_land_em   = EM_LAND
 )
+
+# Choose the same scheme as target if identity test
+NAME == "TEST_IDENTITY" && (LW_TARGET = deepcopy(lw_train))
+
 
 # Define loss config
 loss_config = LossConfig(
@@ -173,11 +189,10 @@ write_info(;
     ),
 
     model_type = (;
-        model            = string(nameof(MODEL)),
-        lw_target        = string(nameof(typeof(LW_TARGET))),
-        transmissivity   = string(nameof(typeof(LW_TARGET.transmissivity))),
-        emissivity_ocean = LW_TARGET.radiative_transfer.emissivity_ocean,
-        emissivity_land  = LW_TARGET.radiative_transfer.emissivity_land,
+        model       = string(nameof(MODEL)),
+        lw_target   = string(nameof(typeof(LW_TARGET))),
+        emissivity_ocean = EM_OCEAN,
+        emissivity_land  = EM_LAND,   
     ),
 
     loss = (;
@@ -205,7 +220,7 @@ write_info(;
     ),
 
     perturbation = (;
-        fac_pert_t = FAC_PERT_T,
+        fac_pert_T = FAC_PERT_T,
         fac_pert_q = FAC_PERT_Q,
     ),
 

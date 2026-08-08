@@ -35,7 +35,7 @@ function sample_trajectory(
 )
 
     # Initialize sim, do a first step and set initial condition
-    first_steps!(sim; steps = n_samples * n_gap + 1)
+    first_steps!(sim; planned_steps = n_samples * n_gap + 1)
     copy!(sim.variables, initial_condition)
 
     # Create container for probed fields with a first entry
@@ -88,6 +88,11 @@ function generate_rollout(;
     heatmap_traj,   # trajectory the returned fields are taken from
 )
 
+    # Throw error is heatmap_days exceed max_horizon
+    if maximum(heatmap_days) > max_horizon
+        error("heatmap_days $(heatmap_days) exceed max_horizon = $max_horizon")
+    end
+
     # Load the scheme if it is given by name
     lw_scheme = resolve_scheme(scheme)
 
@@ -115,7 +120,7 @@ function generate_rollout(;
         ncols = map(probe -> n_cols(probe(ref[0])), probes)
 
         # Prepare containers for the metrics
-        curve(nc) = zeros(Float64, max_horizon, n_traj, nc)
+        curve(nc) = zeros(Float32, max_horizon, n_traj, nc)
         scores = map(nc -> (; rmse    = curve(nc), bias = curve(nc),
                            maxdiff = curve(nc), mean = curve(nc)), ncols)
 

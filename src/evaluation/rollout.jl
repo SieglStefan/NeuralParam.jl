@@ -45,7 +45,10 @@ function plot_rollout(;
         unit = get(DEF_PROBE_UNITS, probe, "")
         p = Plots.plot(; xlabel = "forecast horizon [days]",
                          ylabel = isempty(unit) ? String(probe) : "$(probe) [$(unit)]",
-                         title  = String(probe), titlefontsize = 10, legend = :topleft)
+                         title  = String(probe),
+                         titlefontsize = 10,
+                         titlefontcolor = get(FIELD_COLORS, probe, :black),
+                         legend = :topleft)
 
         # One line per scheme
         for (name, r) in pairs(rollouts)

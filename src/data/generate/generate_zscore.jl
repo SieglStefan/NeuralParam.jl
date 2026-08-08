@@ -2,15 +2,15 @@
 ###
 ### Writes to data/stats/<name>/:
 ###     stats.jld2                  the statistics (below)
-###     regression_samples.jld2     raw subsample kept for the plots
-###     plots/                      histograms + regression fits (do_plots)
+###     plots/                      histograms + regression fits
 ###
 ### Structure of `data = load_zscore(name)` — every leaf is (; mean, std):
 ###
 ###     data.inputs.T       profile -> Vector(nlayers),  e.g. data.inputs.T.mean
 ###     data.inputs.Ts      scalar  -> Vector(1),        e.g. data.inputs.Ts.std[1]
 ###     data.direct         .dT (nlayers), .olw, .slwd
-###     data.linear         .a .b (nlayers), .c .d .e .f .g  - fitted on T
+###     data.linear         .a .b (nlayers), .c .d .e .f .g  - fitted on centered T
+###                         .center.T (nlayers), .center.Ts (1) — subtract before applying
 ###     data.planck         same as .linear, fitted on T^4
 ###     data.nlayers, data.trunc
 ###
@@ -89,7 +89,7 @@ function collect_samples(
         run!(sim, period = t_spinup)
 
         # Initialize simulation and do a first step
-        first_steps!(sim; steps=n_steps_total)
+        first_steps!(sim; planned_steps=n_steps_total)
 
 
         # Propagate the simulation and sample fields

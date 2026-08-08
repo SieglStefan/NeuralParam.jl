@@ -13,12 +13,14 @@
 
 
 # Struct holding zscore parameters
-struct ZScoreStats{VI,VO}
+struct ZScoreStats{VI,VO,C}
     input_mean::VI          # input means
     input_std::VI           # input stds
 
     output_mean::VO         # output means
     output_std::VO          # output stds
+
+    center::C               # predictor center of the output form
 
     zscore_name::String     # name of the stats file
 end
@@ -43,8 +45,10 @@ function ZScoreStats(zscore_name::String, input_spec, output_form, nlayers)
     group_data = getproperty(data, group)
     output_mean, output_std = collect_stats(group_data, output_keys(output_form), zscore_name, "output")
 
+    # Assemle predictor center for the output form
+    center = output_center(output_form, group_data, nlayers)
 
-    return ZScoreStats(input_mean, input_std, output_mean, output_std, zscore_name)
+    return ZScoreStats(input_mean, input_std, output_mean, output_std, center, zscore_name)
 end
 
 

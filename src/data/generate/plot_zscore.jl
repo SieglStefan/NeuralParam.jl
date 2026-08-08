@@ -76,7 +76,7 @@ function thin(max_pts, vecs...)
 end
 
 
-# dT = a*P(T) + b, fitted per column and layer — one panel per layer
+# dT = a + b*P(T), fitted per column and layer — one panel per layer
 function plot_regression_dT(samples, lin, form = LinearOutput(); ncols = 4, max_pts = 3000)
 
     nlayers = Base.size(samples.T, 2)
@@ -95,11 +95,11 @@ function plot_regression_dT(samples, lin, form = LinearOutput(); ncols = 4, max_
         # Line uses the column-MEAN coefficients, the scatter pools all columns,
         # so a spread around the line is expected — it is not a bad fit
         xr = range(extrema(x)...; length = 2)
-        CairoMakie.lines!(ax, xr, lin.a.mean[k] .* xr .+ lin.b.mean[k]; color = :red)
+        CairoMakie.lines!(ax, xr, lin.a.mean[k] .+ lin.b.mean[k].* (xr .- lin.center.T[k]); color = :red)
     end
 
     CairoMakie.Label(fig[0, :],
-        "$(nameof(typeof(form))): dT = a*P(T) + b   (red: column-mean a, b)"; fontsize = 17, font = :bold)
+        "$(nameof(typeof(form))): dT = a + b*(P(T) - P̄)    (red: column-mean a, b)"; fontsize = 17, font = :bold)
     return fig
 end
 
@@ -121,6 +121,8 @@ function plot_regression_flux(samples, lin, form = LinearOutput(); max_pts = 500
     # Column-mean coefficients — what ConstLW starts from
     c, d, e = lin.c.mean[1], lin.d.mean[1], lin.e.mean[1]
     f, g    = lin.f.mean[1], lin.g.mean[1]
+    cT, cTs = lin.center.T, lin.center.Ts[1]
+    mid     = mid_layer(nlayers)
 
     fig = CairoMakie.Figure(size = (1050, 340))
 
@@ -130,7 +132,7 @@ function plot_regression_flux(samples, lin, form = LinearOutput(); max_pts = 500
     x, y = thin(max_pts, vec(T1), vec(samples.olw))
     CairoMakie.scatter!(ax1, x, y; markersize = 2, alpha = 0.2)
     xr = range(extrema(x)...; length = 2)
-    CairoMakie.lines!(ax1, xr, c .+ d .* xr .+ e * mean(Ts); color = :red)
+    CairoMakie.lines!(ax1, xr, c .+ d .* (xr .- cT[mid]) .+ e * (mean(Ts) - cTs); color = :red)
 
     # (2) olw vs Ts, with T[mid_layer] held at its mean
     ax2 = CairoMakie.Axis(fig[1,2]; xlabel = "P(Ts)", ylabel = "olw (W/m²)",
@@ -138,7 +140,7 @@ function plot_regression_flux(samples, lin, form = LinearOutput(); max_pts = 500
     x, y = thin(max_pts, vec(Ts), vec(samples.olw))
     CairoMakie.scatter!(ax2, x, y; markersize = 2, alpha = 0.2)
     xr = range(extrema(x)...; length = 2)
-    CairoMakie.lines!(ax2, xr, c .+ d * mean(T1) .+ e .* xr; color = :red)
+    CairoMakie.lines!(ax2, xr, c .+ d * (mean(T1) - cT[mid]) .+ e .* (xr .- cTs); color = :red)
 
     # (3) slwd vs T[nlayers], only one predictor
     ax3 = CairoMakie.Axis(fig[1,3]; xlabel = "P(T[nlayers])", ylabel = "slwd (W/m²)",
@@ -146,11 +148,11 @@ function plot_regression_flux(samples, lin, form = LinearOutput(); max_pts = 500
     x, y = thin(max_pts, vec(Tb), vec(samples.slwd))
     CairoMakie.scatter!(ax3, x, y; markersize = 2, alpha = 0.2)
     xr = range(extrema(x)...; length = 2)
-    CairoMakie.lines!(ax3, xr, f .+ g .* xr; color = :red)
+    CairoMakie.lines!(ax3, xr, f .+ g .* (xr .- cT[nlayers]); color = :red)
 
     CairoMakie.Label(fig[0, :],
-        "$(nameof(typeof(form))): olw = c + d*P(T[$(mid_layer(nlayers))]) + e*P(Ts)        " *
-        "slwd = f + g*P(T[nlayers])        (red: column-mean coefficients)";
+        "$(nameof(typeof(form))): olw = c + d * (P(T[mid]) - P̄[mid]) + e * (P(Ts) - P̄s)          " *
+        "slwd = f + g * (P(T[nlayers]) - P̄[nlayers])        (red: column-mean coefficients)";
         fontsize = 15, font = :bold)
     return fig
 end

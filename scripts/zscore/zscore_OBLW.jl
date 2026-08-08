@@ -7,7 +7,6 @@
 ###
 ### Additionally:
 ###     - stores meta data of creation of stats at info.toml
-###     - stores a subsample of the raw regression data for later plotting
 ###     - stores histograms of normalized variables and regression scatter plots
 
 
@@ -113,7 +112,7 @@ write_info(;
         groups  = [string(output_group(f)) for f in OUTPUT_FORMS],
         keys    = [string(nameof(typeof(f))) * ": " * join(string.(output_keys(f)), ", ")
                    for f in OUTPUT_FORMS],
-        forms   = ["affine: dT = a*P(T) + b", "olw = c + d*P(T[nlayers÷2]) + e*P(Ts)",
+        forms   = ["affine: dT = a + b*P(T)", "olw = c + d*P(T[nlayers÷2]) + e*P(Ts)",
                    "slwd = f + g*P(T[nlayers])", "P = identity (linear) or x^4 (planck)"],
     ),
 

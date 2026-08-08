@@ -55,10 +55,10 @@ end
 
 
 # Struct holding loss configuration parameters
-@kwdef struct LossConfig{W<:NamedTuple, F<:NamedTuple, G<:AbstractVector}
-    weights::W = (; T = 1f0, olw = 1f0, slwd = 1f0)        # loss weighting factors
-    field_norm::F                                          # field normalization factors (zscore)
-    grid_weights::G                                        # grid area weights
+struct LossConfig{W<:NamedTuple, F<:NamedTuple, G<:AbstractVector}
+    weights::Waterfall      # loss weighting factors
+    field_norm::F           # field normalization factors (zscore)
+    grid_weights::G         # grid area weights
 end
 
 # Convenvience constructor for LossConfig loading zscore stats from a file
@@ -94,49 +94,27 @@ function LossConfig(;
 end
 
 
-# Load field normalization factors from zscore file
+# Const for scaling temperature error in loss function (K)
+const T_ERR_SCALE = 0.5f0  
+
+# olw/slwd: climatological std — a flux error IS of climatological size, so nrmse ≈ 1
+#           means "no better than the global mean".
+# T:        NOT climatological. The T error is the integrated effect of the scheme error
+#           over n_steps and can never reach 1σ_clim. Fixed trajectory-divergence scale.
 function load_field_norm(zscore_name::String)
 
     data = load_zscore(zscore_name)
 
-    # The loss is normalized by the RAW field stds, which live in the :direct group
-    haskey(data, :direct) || error(
-        "Stats in $zscore_name have no :direct group. The loss normalization needs the raw " *
-        "olw/slwd stds from it — regenerate the stats with DirectOutput() in output_forms.")
+    # The loss is normalized by the RAW field stds, which live in the :fields group —
+    # independent of which output forms were fitted and of which inputs a scheme selects.
+    haskey(data, :fields) || error(
+        "Stats in $zscore_name have no :fields group — regenerate them.")
 
+    nlayers = length(data.fields.T.std)
 
     return (;
-        T    = reshape(Float32.(data.inputs.T.std), 1, :),
-        olw  = Float32(data.direct.olw.std[1]),
-        slwd = Float32(data.direct.slwd.std[1]),
+        T    = fill(T_ERR_SCALE, 1, nlayers),
+        olw  = Float32(data.fields.olw.std[1]),
+        slwd = Float32(data.fields.slwd.std[1]),
     )
 end
-
-
-
-
-
-
-
-
-    # Seed reverse AD with dMSE/dT_train_out, where T_out is the final temperature after n_steps.
-    #
-    # Before autodiff:
-    #   bvars_ad.grid.temperature = dL/dT_train_out = 2 .* (T_train_out .- T_target_out) ./ N
-    #          -> L = (T_train_out - T_target_out)^2 / N = MSE
-    #
-    # After autodiff:
-    #   bvars_ad contains dL/d(vars_ad input)
-    #
-
-
-
-        # Seed reverse AD with dMSE/dT_train_out, where T_out is the final temperature after n_steps.
-    #
-    # Before autodiff:
-    #   bvars_ad.grid.temperature = dL/dT_train_out = 2 .* (T_train_out .- T_target_out) ./ N
-    #          -> L = (T_train_out - T_target_out)^2 / N = MSE
-    #
-    # After autodiff:
-    #   bvars_ad contains dL/d(vars_ad input)
-    #

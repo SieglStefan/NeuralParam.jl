@@ -75,7 +75,7 @@ function training_online(;
         n_steps = tc.n_steps_0 + (ic-1) * tc.n_steps_inc
 
         # Draw a starting date
-        start_date = sample_start_date(bin_order[ic], tc.n_ic)
+        start_date = sample_start_date(bin_order[ic], tc.n_ic; start=tc.start_date) - tc.t_spinup
     
         # Prepare reference simulation 
         sim_ref = prepare_reference(sims.template, tc, n_steps, start_date)

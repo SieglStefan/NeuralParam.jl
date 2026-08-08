@@ -61,10 +61,10 @@ end
 
 
 # Initialize a simulation and do a first step (to initialize implicit solver)
-function first_steps!(sim; steps=2)
+function first_steps!(sim; planned_steps = 2)
 
     # Initialize simulation and do a first step
-    SpeedyWeather.initialize!(sim, steps=steps)
+    SpeedyWeather.initialize!(sim, steps=planned_steps)
 
     for _ in 1:2
         SpeedyWeather.time_step!(sim)

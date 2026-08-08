@@ -3,11 +3,8 @@
 #SBATCH --qos=short
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
-#SBATCH --cpus-per-task=4
+#SBATCH --cpus-per-task=1
 #SBATCH --time=08:00:00
-#SBATCH --job-name=train
-#SBATCH --output=slurm_logs/train-%A_%a.out
-#SBATCH --error=slurm_logs/train-%A_%a.err
 set -euo pipefail
 
 SCRIPT=${1:?"Usage: sbatch --array=... scripts/training/submit.sh <name-without-.jl>"}

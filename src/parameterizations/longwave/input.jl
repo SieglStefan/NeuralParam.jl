@@ -18,7 +18,7 @@ end
 @inline function in_q(X, o, ij, vars, model, scheme)
     q = SpeedyWeather.get_prognostic_step(vars.grid.humidity, model.time_stepping, scheme)
     for k in axes(q, 2)
-        X[o+k] = log10(q[ij,k] + 1f-9)          # add small number to avoid log10(0) = -Inf
+        X[o+k] = log10(max(q[ij,k], 0f0) + 1f-9)        # add small number to avoid log10(0) = -Inf (similar max() for negatives)
     end
     return o + size(q, 2)
 end
@@ -56,7 +56,7 @@ const INPUT_NLW_OBLW = input_spec(:T, :Ts, :lat)
 
 
 # Function for summing the length of the input vector
-n_inputs(input_spec, nlayers) = sum((last(e) === :profile ? nlayers : 1) for e in values(input_spec))
+n_inputs(input_spec, nlayers) = sum((last(e) === :profile ? nlayers : 1) for e in values(input_spec); init = 0)
 
 # Function for mapping every input to its slice of the input vector, e.g. (; T = 1:8, Ts = 9:9)
 function input_layout(input_spec, nlayers)

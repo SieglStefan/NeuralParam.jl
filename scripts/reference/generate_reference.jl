@@ -32,8 +32,8 @@ variants = [
     ),
 
     # 1. No longwave radiation scheme         
-    (;  name        = "FreeRun_default",
-        lw_scheme   = nothing,
+    (;  name        = "ZeroLW_default",
+        lw_scheme   = ZeroLW(),
     ),
 
     # 2. OneBandLongwave default                  
@@ -56,17 +56,14 @@ SEED       = get(v, :seed, 1234)                # used seed
 EM_OCEAN    = get(v, :em_ocean, 0.98f0)
 EM_LAND     = get(v, :em_land,  0.98f0)
 
-# Model and target scheme
+# Model and lw scheme
 MODEL       = get(v, :model, PrimitiveWetModel)             # used model
-LW_TARGET   = OneBandLongwave(SG;                           # used longwave radiation scheme
-    transmissivity     = FriersonLongwaveTransmissivity(SG),
-    radiative_transfer = OneBandLongwaveRadiativeTransfer(SG;
-                            emissivity_ocean = EM_OCEAN,
-                            emissivity_land  = EM_LAND),
-)
-
-MODEL      = get(v, :model, PrimitiveWetModel)  
-LW_SCHEME  = get(v, :lw_scheme, LW_TARGET)        
+LW_SCHEME   = get(v, :lw_scheme, OneBandLongwave(SG;        # used longwave radiation scheme
+                                    transmissivity     = FriersonLongwaveTransmissivity(SG),
+                                    radiative_transfer = OneBandLongwaveRadiativeTransfer(SG;
+                                                    emissivity_ocean = EM_OCEAN,
+                                                    emissivity_land  = EM_LAND),
+))
 
 # Sampling
 T_SPINUP   = get(v, :t_spinup, Day(30))                     # spinup time in days
@@ -81,7 +78,8 @@ FAC_PERT_Q = get(v, :fac_pert_q, 0.2f0)         # multiplicative perturbation am
 
 ### Prepare generation
 # Create output folder
-DIR = prepare_out_dir(reference_dir(), NAME)
+out_dir = startswith(NAME, "TEST") ? fresh_out_dir : prepare_out_dir
+DIR = out_dir(reference_dir(), NAME)
 
 # Set seed for reproducability
 Random.seed!(SEED)

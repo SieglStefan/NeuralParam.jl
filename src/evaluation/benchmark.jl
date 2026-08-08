@@ -16,7 +16,7 @@ function evaluate_benchmark(
     sim = initialize!(model(spectral_grid; longwave_radiation = scheme))
     
     # Initialize steps and do a first timestep
-    first_steps!(sim; steps=n_steps+1)
+    first_steps!(sim; planned_steps=n_steps+1)
 
 
     # Fresh simulation per sample: sim_timesteps! mutates, so samples must not chain

@@ -1,8 +1,6 @@
 ### Heatmap utilities
 ###
 ### Functions for plotting heatmaps, primarly used in evaluation/rollouts.jl
-###     - plot_heatmap:         plots a single heatmap of a field
-###     - plot_heatmaps:        plots multiple heatmaps of fields with shared colorbar
 
 
 

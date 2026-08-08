@@ -4,7 +4,7 @@
 
 
 
-# Initialize .csv file and create a info.toml file for meta data
+# Initialize .csv file for training info
 function csv_init(metric_keys; dir="", file="")
 
     # Create path and put together filepath
@@ -88,6 +88,10 @@ function compute_metrics(lw_train, tc, sims, grads)
     loss_t, loss_olw, loss_slwd = nrmse_T^2, nrmse_olw^2, nrmse_slwd^2
     loss_total = w.T * loss_t + w.olw * loss_olw + w.slwd * loss_slwd
 
+    # Raw bias (physical units: K, W/m^2)
+    bias_T    = wmean(res_T,    gw)
+    bias_olw  = wmean(res_olw,  gw)
+    bias_slwd = wmean(res_slwd, gw)
 
     # Return diagnostics
     return (;
@@ -96,9 +100,9 @@ function compute_metrics(lw_train, tc, sims, grads)
         loss_total = loss_total, loss_T = loss_t, loss_olw = loss_olw, loss_slwd = loss_slwd,
 
         # Raw rmse and bias (physical units: K, W/m^2)
-        rmse_T    = sqrt(wmean(abs2.(res_T),    gw)),   bias_T    = wmean(res_T,    gw),
-        rmse_olw  = sqrt(wmean(abs2.(res_olw),  gw)),   bias_olw  = wmean(res_olw,  gw),
-        rmse_slwd = sqrt(wmean(abs2.(res_slwd), gw)),   bias_slwd = wmean(res_slwd, gw),
+        rmse_T    = sqrt(wmean(abs2.(res_T),    gw)),   bias_T    = bias_T,
+        rmse_olw  = sqrt(wmean(abs2.(res_olw),  gw)),   bias_olw  = bias_olw,
+        rmse_slwd = sqrt(wmean(abs2.(res_slwd), gw)),   bias_slwd = bias_slwd,
 
         # Normalized rmse and bias
         nrmse_T,    nbias_T    = wmean(res_T    ./ fn.T,    gw),
@@ -109,6 +113,9 @@ function compute_metrics(lw_train, tc, sims, grads)
         mean_T    = wmean(T_target,    gw),
         mean_olw  = wmean(olw_target,  gw),
         mean_slwd = wmean(slwd_target, gw),
+
+        # Additional diagnostics
+        bias_C    = - bias_olw - bias_slwd,         # atmospheric LW convergence 
         
         # Optimizer diagnostics
         pnorm = tree_l2norm(lw_train.ps),

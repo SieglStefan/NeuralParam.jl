@@ -36,7 +36,7 @@ OBLW        = OneBandLongwave(SG;
 REF_OBLW    = "OBLW_default"
 
 # Trajectory protocols
-SKILL       = (; max_horizon = 31,  n_traj = 52, heatmap_days = [1,3,7,14])
+SKILL       = (; max_horizon = 31,  n_traj = 52, heatmap_days = [0,1,3,7,14])
 STAB        = (; max_horizon = 180, n_traj = 4,  heatmap_days = [1,30,90,180])
 
 
@@ -46,27 +46,27 @@ variants = [
 
     ### 0. Test variant
     (;  name            = "TEST_ROLLOUT",
-        scheme          = nothing,
+        scheme          = ZeroLW(),
         reference       = REF_OBLW,
         max_horizon     = 10,
         n_traj          = 2,
         rollout_t       = 20,
-        heatmap_days    = [1,20],
+        heatmap_days    = [1,10],
         heatmap_traj    = 1,
     ),
 
 
 
-    ### FreeRun OneBandLongwave (no longwave parameterization)
+    ### ZeroLW (no longwave parameterization)
     # 1. Skill
-    (;  name            = "FreeRunOBLW_default_skill",
-        scheme          = nothing,
+    (;  name            = "ZeroLW_default_skill",
+        scheme          = ZeroLW(),
         reference       = REF_OBLW,
         SKILL...
     ),
     # 2. Stability
-    (;  name            = "FreeRunOBLW_default_stab",
-        scheme          = nothing,
+    (;  name            = "ZeroLW_default_stab",
+        scheme          = ZeroLW(),
         reference       = REF_OBLW,
         STAB...
     ),
@@ -189,7 +189,7 @@ v = variants[task+1]
 NAME         = get(v, :name, "NoName_default")          # name of the rollout
 
 # Scheme and reference
-SCHEME       = get(v, :scheme, nothing)                 # scheme to roll out
+SCHEME       = get(v, :scheme, ZeroLW())                # scheme to roll out
 REFERENCE    = get(v, :reference, REF_OBLW)             # reference for comparison
 
 # Model
@@ -209,7 +209,8 @@ HEATMAP_TRAJ = get(v, :heatmap_traj, 1)                 # choice of specific tra
 
 ### Prepare generation
 # Create output folder
-DIR = fresh_out_dir(rollout_dir(), NAME)
+out_dir = startswith(NAME, "TEST") ? fresh_out_dir : prepare_out_dir
+DIR = out_dir(rollout_dir(), NAME)
 
 
 
@@ -257,7 +258,7 @@ write_info(;
         scheme       = scheme_name(SCHEME),
         reference    = REFERENCE,
         probes       = [string(p) for p in keys(PROBES)],
-        metrics      = ["rmse", "bias"],
+        metrics      = ["rmse", "bias", "maxdiff", "mean"],
     ),
 
     sampling = (;

@@ -9,7 +9,7 @@ using Optimisers
 using Enzyme
 using Checkpointing
 
-using JLD2
+import JLD2
 using CSV
 using DataFrames
 using TOML
@@ -24,9 +24,6 @@ using GeoMakie
 using RingGrids
 
 using Accessors
-
-using Adapt
-using MLDataDevices: cpu_device, gpu_device
 using BenchmarkTools
 
 
@@ -96,8 +93,8 @@ export
         # generate/generate_rollout.jl
                 DEF_PROBES,
                         #sample_trajectory,
-                        #n_layers,
-                        #get_layer,
+                        #n_cols,
+                        #get_col,
                 generate_rollout,
         # generate/generate_zscore.jl
                         #target_outputs!,
@@ -155,17 +152,23 @@ export
                         #mid_layer,
                         #decode!,
                         #lw_state,
-
                         #write_lw!,
                         #predictor,
                         #affine_stats,
                         #output_stats,
+                        #output_center,
         # scheme_const.jl
                 ConstLW,
                         #update_ps,
                 info_scheme,
         # scheme_neural.jl
                 NeuralLW,
+                        #update_ps,
+                        #info_scheme,
+        # scheme_zero.jl
+                ZeroLW,
+                        #update_ps,
+                        #info_scheme,
 
         ### training
         # config.jl
@@ -184,6 +187,9 @@ export
                 LossConfig,
                         #load_field_norm,
         # plotting.jl
+                FIELD_COLORS,
+                log_or_lin,
+                ic_bounds,
                 plot_loss,
                 plot_training,
                 plot_training_comp,
@@ -248,6 +254,7 @@ include("parameterizations/abstract.jl")
 include("parameterizations/longwave/abstract_longwave.jl")
 include("parameterizations/longwave/input.jl")
 include("parameterizations/longwave/output.jl")
+include("parameterizations/longwave/scheme_zero.jl")
 include("parameterizations/longwave/scheme_const.jl")
 include("parameterizations/longwave/scheme_neural.jl")
 

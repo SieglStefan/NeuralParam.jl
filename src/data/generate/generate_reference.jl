@@ -49,7 +49,7 @@ function generate_reference(;
 
     
     # Initialize simulation (run! unscales vorticity/divergence) and perform the first steps
-    first_steps!(sim; steps = sim_days * steps_per_day + 1)
+    first_steps!(sim; planned_steps = sim_days * steps_per_day + 1)
 
 
     ### Sample the simulation, one state per simulated day
